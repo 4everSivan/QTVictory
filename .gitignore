@@ -1,0 +1,24 @@
+# ---- 参考材料（本地留存，不入库） ----
+reference/
+
+# ---- AI / Agent 工具产生的隐藏目录 ----
+.claude/
+.claude.*
+.cursor/
+.cursorrules
+.codex/
+.zcode/
+.agents/
+.cc-switch/
+.aider*
+.windsurf/
+.continue/
+.trae/
+.mimosa/
+.copilot/
+
+# ---- 系统缓存文件 ----
+.DS_Store
+**/.DS_Store
+._.Thumbs
+Thumbs.db
