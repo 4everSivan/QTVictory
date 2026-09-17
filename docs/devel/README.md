@@ -19,6 +19,8 @@
 - **[assessment/](assessment/README.md)** —— AI Agent 研发质量量化评估体系与报告；
 - **[todo/](todo/README.md)** —— 待办与需求缓冲池，未入轨缺陷与需求的登记表（落地即移出，零沉淀）。
 
+> 📌 **归档约定**：版本 tag 打出后，plan/、task/、report/、assessment/ 将按 [docs/archive/README.md](../archive/README.md) 的 SOP 整体迁移至 `docs/archive/<版本号>/` 封存（只读）；当前尚未归档。
+
 当前状态：Phase 1 模拟底座与观察员控制台双线（M1–M16 / T01–T22）均已收口并通过终验。项目总览见根 [README.md](../../README.md)。
 
 ---
@@ -61,4 +63,58 @@ docs/devel/
 - **想要核验最新代码修复或功能回调**：请查看 [change/](change/README.md) 中的变更卡，直接核对三联前后对比表与人工 Checklist；
 - **想要查验历史交付质量与测试证据**：请查阅 [report/](report/README.md) 中的阶段验收报告或 [assessment/](assessment/README.md) 中的评估报告；
 - **想要定位特定模块的历史任务定义**：请通过 [plan/](plan/README.md) 的追踪矩阵跳转到对应的 [task/](task/README.md) 任务卡；
-- **想要登记或查看未入轨的缺陷与需求**：请查阅 [todo/](todo/README.md) 缓冲池，注意事项一旦建卡或落入设计即被物理移出。
+- **想要登记或查看未入轨的缺陷与需求**：请查阅 [todo/](todo/README.md) 缓冲池，注意事项一旦建卡或落入设计即被物理移出；
+- **想要了解需求 / 缺陷在文档体系中的完整流转**：见 §5 文档治理流程。
+
+---
+
+## 5. 文档治理流程（事项流转总线）
+
+所有开发事项（需求 / 缺陷 / 微调 / 复验 / 债务）在本目录内按固定链路流转，每步产出落在对应目录。签核红线见根 [AGENTS.md](../../AGENTS.md)，元数据契约见 [docs/README.md](../README.md) §3。
+
+### 5.1 两条主链路
+
+```
+【登记层】  缺陷 / 微调 / 复验 ──► todo/now.md 表格登记
+           功能 / 债务       ──► todo/future.md 表格登记
+                  （落地即移出 · 零沉淀 · 编号只增）
+
+【缺陷修复链路】 Bug / 功能回调 / 参数微调
+  now.md 登记
+   └─► change/ 建 C00x 卡（BugFix / Rollback / Refactor / Param）  ★ 建卡即从 todo 移除
+        └─► 前后对比表 + Checklist
+             └─► 改代码 + 补回归测试（pytest / vitest / e2e）
+                  └─► design/ 章节同步修订 + 双向回链（📌 关联变更）
+                       └─► AI 汇报实测 → 人工会话确认 → AI 代签（待核验 → 核验通过）
+                            └─► 合入主干
+                                 └─► 回写闭环：design 三处回写 + CHANGELOG 互链 + git tag
+
+【功能设计链路】 新功能 / 新 Phase 立项
+  future.md 登记方向
+   └─► design/ 新增或修订章节（讨论中 → 现行基线）  ★ 完成设计即从 todo 移除
+        └─► plan/ 建 M 卡 + task/ 建 T 卡（编号只增，Phase 2 起）
+             └─► 按 T 卡 DoD 开发
+                  └─► 测试（pytest / vitest / e2e）
+                       └─► report/ 验收报告（通过 / 受限通过 / 未通过）
+                            └─► 收口：T 卡冻结 + CHANGELOG 记账 + git tag
+
+【支线】 待复验事项（now.md EN 表）
+   └─► report/ 补充结论或实测复验 ──► 结论落入报告即从 todo 移除
+```
+
+### 5.2 事项类型 × 流转去向速查
+
+| 事项类型 | 登记入口 | 第一去向 | 最终载体 | 闭环标志 |
+|---|---|---|---|---|
+| 缺陷 Bug | `todo/now.md` Bugs 表 | `change/` C00x (BugFix) | C 卡 + design 回链 + CHANGELOG | 核验通过并回写闭环 |
+| 体验微调 / 参数 | `todo/now.md` EN 表 | `change/` C00x (Param/Refactor) | 同上 | 同上 |
+| 待复验事项 | `todo/now.md` EN 表 | `report/` 补充结论 / 实测复验 | 验收报告 | 结论落入报告并移出 |
+| 新功能方向 | `todo/future.md` FT 表 | `design/` 章节 → `plan/` + `task/` 立项 | design + M/T 卡 + 验收报告 | 验收通过、T 卡冻结 |
+| 技术债务 | `todo/future.md` TD 表 | `change/` (Refactor) 或 `design/` | C 卡或 design 章节 | 建卡 / 落设计即移出 |
+
+### 5.3 全程纪律
+
+1. **零沉淀**：todo 只记未入轨事项，落地即物理移出，历史由 change / design / report 承载；
+2. **双向回链**：design 章节与 C 卡、CHANGELOG 条目与 C 卡必须双向互链，杜绝单向孤岛；
+3. **编号只增**：C / M / T / BG / EN / FT / TD 编号均只增不复用；
+4. **AI 代签**：测试与实测由 AI 执行并向人工汇报，人工会话确认后由 AI 代签收尾并记录确认依据。

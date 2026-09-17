@@ -5,7 +5,7 @@
 ## 流程红线（不可绕过）
 
 1. **变更先行卡**：Bug 修复 / 功能回调 / 参数调整 / 接口微调，先在 `docs/devel/change/` 复制 `template.md` 建 `C00x` 变更卡，再动代码；严禁跳过。
-2. **任务卡只读**：`docs/devel/task/` 与 `docs/devel/plan/` 已随 Phase 1 封存归档，一律不修改；Phase 2 立项才可在 plan/task 新建卡片。
+2. **任务卡只读**：`docs/devel/task/` 与 `docs/devel/plan/` 已随 Phase 1 封存，一律不修改；版本 tag 打出后按 `docs/archive/README.md` SOP 整体归档；Phase 2 立项才可在 plan/task 新建卡片。
 3. **design 活基线与双向回链**：变更涉及设计规则时，同步修订 `docs/devel/design/` 对应章节（保持全文自洽），对应章节原位增补回链（`> 📌 **关联变更**: [C00x]...`），文末变更记录增补条目并回链 C 编号，头部"关联变更"追加 C 编号，杜绝单向孤岛。
 4. **CHANGELOG 同步**：核验通过的 C 卡按 semver 记账（规则见 [docs/README.md](docs/README.md) §3.3），CHANGELOG 条目与 C 卡双向互链。
 5. **元数据契约**：文档头部引用块 `**键名**: 值 ｜ 键值`——半角冒号加单空格、全角竖线分隔、状态枚举纯净（禁括号小尾巴）、日期 ISO `YYYY-MM-DD`。
@@ -57,5 +57,5 @@
 - 设计事实源：`docs/devel/design/`（01 前端 / 02 后端）
 - 变更核验：`docs/devel/change/`
 - 待办与需求缓冲池：`docs/devel/todo/`（表格化记录未入轨需求与缺陷，落地即移出，零沉淀）
-- 验收证据：`docs/devel/report/`、`docs/devel/assessment/`
+- 验收证据：`docs/devel/report/`、`docs/devel/assessment/`（版本 tag 后归档至 `docs/archive/`，SOP 见 `docs/archive/README.md`）
 - 部署运维：`docs/guide/`（01 单机部署运维 / 02 测试环境部署）

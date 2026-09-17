@@ -24,6 +24,9 @@ docs/
 │   ├── assessment/     # AI Agent 研发质量评估与证据体系
 │   └── todo/           # 待办与需求缓冲池（按版本分文件登记，落地即移出）
 │
+├── archive/            # 【历史归档】版本 tag 后封存阶段文档（只读；规则已立，尚未启用）
+│   └── README.md       # 归档库索引、归档纪律与操作 SOP
+│
 └── guide/              # 【用户与运维指南】面向使用者与部署运维
     ├── README.md       # guide 子目录索引
     ├── 01-单机部署与运维指南.md # 本机单实例部署与环境变量配置
@@ -191,6 +194,11 @@ docs/
 - **表格化呈现**：所有缺陷与功能一律采用标准 Markdown 表格记录，明确 ID、模块、描述、优先级/严重度、登记日期与流转目标；
 - **落地即移出（零沉淀纪律）**：只要事项落入 [change/](devel/change/README.md)（创建 C 卡）或 [design/](devel/design/README.md)（更新设计基线），**必须立即从 todo 表格中物理删除**；`todo/` 坚决不保留 `[x]` 历史勾选项，闭环与审计由 change/design 全权承载。
 - **编号与度量口径**：前缀语义（BG/EN/FT/TD）+ 四位序号只增不复用、严重度 S1–S4 与优先级 P0–P3 受控枚举、版本文件生命周期与标准表模板，详见 [todo/README.md](devel/todo/README.md) §2–§5。
+
+#### ⑨ 历史版本归档库（`docs/archive/`）—— 只读快照模型
+- **归档时机**：每次打出版本 tag 后，将该版本的 `plan/`、`task/`、`report/`、`assessment/` 从 `docs/devel/` 整体迁移至 `docs/archive/<版本号>/`；
+- **只读封存**：归档文档一律不再修改；活文档（design / change / todo / env）始终留在 `docs/devel/` 不归档；
+- **细则与 SOP**：见 [archive/README.md](archive/README.md)。
 
 
 ---
