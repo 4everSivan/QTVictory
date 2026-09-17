@@ -88,7 +88,7 @@ describe('交易计划面板（01 §4.10〔v2 新增〕）', () => {
   it('条件单列表：触发器 → 动作 → 状态', async () => {
     render(<PlanPanel traderId={1} />)
     const list = await screen.findByTestId('entry-list')
-    expect(list).toHaveTextContent('价格穿越')
+    await waitFor(() => expect(list).toHaveTextContent('价格穿越'))
     expect(list).toHaveTextContent('价格穿越 ≤ 1250')
     expect(list).toHaveTextContent('买入 ×100 限价@1250')
     expect(list).toHaveTextContent('WAITING')

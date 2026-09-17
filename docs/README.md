@@ -185,9 +185,11 @@ docs/
 > **适用角色**: [量化开发者 / 观察员 / 运维人员] ｜ **最后更新**: YYYY-MM-DD
 ```
 
-#### ⑧ 待办与缺陷清单（`docs/devel/TODO.md`）—— 豁免说明
-- `TODO.md` 游离于上述六类模型之外，仅需保留 `> 用途 ｜ 最后更新` 简头，不纳入元数据契约；
-- **职责与结构**：按版本迭代划分章节（当前版本如 `v0.1.0` 与后续迭代 `future`），各版本内分设缺陷修复（Bugs）与功能迭代（Features）；所有 Bug 发现后必须先在 `TODO.md` 对应版本章节登记，再走 [change/](devel/change/README.md) 变更卡执行修复与核验闭环。
+#### ⑧ 待办与需求缓冲池（`docs/devel/todo/`）—— 缓冲池模型
+- **定位与契约**：`todo/` 作为项目未入轨事项的轻量缓冲池（Backlog Intake Queue），按版本拆分独立文件（如 [v0.1.0.md](devel/todo/v0.1.0.md)、[future.md](devel/todo/future.md)），支持多端/多 Agent 并行编辑，避免单一文件合并冲突；
+- **表格化呈现**：所有缺陷与功能一律采用标准 Markdown 表格记录，明确 ID、模块、描述、优先级/严重度、登记日期与流转目标；
+- **落地即移出（零沉淀纪律）**：只要事项落入 [change/](devel/change/README.md)（创建 C 卡）或 [design/](devel/design/README.md)（更新设计基线），**必须立即从 todo 表格中物理删除**；`todo/` 坚决不保留 `[x]` 历史勾选项，闭环与审计由 change/design 全权承载。
+
 
 ---
 

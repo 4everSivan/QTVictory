@@ -6,18 +6,16 @@
 
 ---
 
-## [0.1.1] - 2026-09-17
-
-### 修复 (Fixed)
-- **日K 引导入库元组缺 code 导致 klines 表永空**：`TencentAdapter.fetch_daily_klines` 返回 6 元组与 `DataStore.upsert_klines` 的 7 元组契约不匹配，启动引导静默失败，前端"日K"页签永远空白。已对齐为 7 元组契约并补适配器→store 契约回归测试。详见变更卡 [C001](docs/devel/change/C001-修复日K引导入库元组缺code.md)。
-
----
-
 ## [0.1.0] - 2026-09-17
 
 ### 概述 (Overview)
 
 **QTVictory 0.1.0** 是首个正式功能基线版本（**Phase 1 · 模拟底座与观察员控制台**）。该版本确立了纯私人、单机自部署定位的 A 股实时前向仿真模拟交易系统，完整实现了规则级撮合引擎、计划引擎、多交易员实例管理体系以及基于 Nothing 设计系统的现代化 Web 监控控制台。
+
+---
+
+### 维护与修复 (Fixed)
+- **日K 引导入库元组缺 code 导致 klines 表永空**：`TencentAdapter.fetch_daily_klines` 返回 6 元组与 `DataStore.upsert_klines` 的 7 元组契约不匹配，启动引导静默失败，前端"日K"页签永远空白。已对齐为 7 元组契约并补适配器→store 契约回归测试。详见变更卡 [C001](docs/devel/change/C001-修复日K引导入库元组缺code.md)。
 
 ---
 

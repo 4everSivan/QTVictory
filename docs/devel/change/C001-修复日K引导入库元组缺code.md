@@ -56,5 +56,5 @@
 - **结论**：通过
 - **会话确认记录**：2026-09-17 会话中人工确认原话"日k显示正常了"；此前 AI 已汇报核验事实——pytest 133 项全绿、8788 实例重启后 `/api/market/kline` 返回真实日K、design 02 双向回链齐备。
 - **版本归档**：
-  - 关联提交：`待提交`
-  - 纳入版本：`[v0.1.1](../../../CHANGELOG.md)`
+  - 关联提交：`[14d108e](https://github.com/4everSivan/QTVictory/commit/14d108e)`
+  - 纳入版本：`[v0.1.0](../../../CHANGELOG.md)`

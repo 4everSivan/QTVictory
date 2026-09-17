@@ -17,8 +17,8 @@
 
 ### 功能设计入口（新功能 / 新 Phase 立项）
 
-1. **方向登记**：在 `docs/devel/TODO.md` 登记方向级事项（仅方向，不写实现细节）。
-2. **设计稿先行**：在 `docs/devel/design/` 新增或修订对应章节，头部状态从 `讨论中` 起步，评审通过后改 `现行基线`。
+1. **方向登记**：在 `docs/devel/todo/` 对应文件（如 `future.md`）登记方向级事项（仅方向，不写实现细节）。
+2. **设计稿先行**：在 `docs/devel/design/` 新增或修订对应章节，头部状态从 `讨论中` 起步，评审通过后改 `现行基线`；完成设计后从 `todo/` 对应表格中移除该项。
 3. **立项拆解**：在 `docs/devel/plan/` 新建 M 卡、`docs/devel/task/` 新建 T 卡（编号只增不插）；Phase 2 起才允许新建，Phase 1 卡片已封存。
 4. **开发**：按 T 卡范围与 DoD 执行，不超范围。
 5. **测试**：跑下方"测试命令"全部适用项，结果写入验收材料。
@@ -27,7 +27,7 @@
 
 ### Bug 修复入口（缺陷 / 功能回调 / 参数调整）
 
-1. **登记与建卡**：发现 Bug 先在 `docs/devel/TODO.md` 对应版本章节登记，再在 `docs/devel/change/` 复制 `template.md` 建 `C00x`（编号只增），类型枚举：BugFix / Rollback / Refactor / Param。
+1. **登记、建卡与移出**：发现 Bug 先在 `docs/devel/todo/` 对应版本表格登记；在 `docs/devel/change/` 复制 `template.md` 建 `C00x`（编号只增）后，**立即从 todo 表格中移除该项**（零沉淀纪律），类型枚举：BugFix / Rollback / Refactor / Param。
 2. **对比表与 Checklist**：卡内填前后对比表，列清影响面与回滚方式。
 3. **改代码 + 补测试**：实现修复并补回归测试，跑下方"测试命令"。
 4. **同步 design**：涉及设计规则时修订 `docs/devel/design/` 对应章节（红线 3）。
@@ -56,6 +56,6 @@
 
 - 设计事实源：`docs/devel/design/`（01 前端 / 02 后端）
 - 变更核验：`docs/devel/change/`
-- 待办与缺陷清单：`docs/devel/TODO.md`（按当前版本与 future 分类登记缺陷与功能规划）
+- 待办与需求缓冲池：`docs/devel/todo/`（表格化记录未入轨需求与缺陷，落地即移出，零沉淀）
 - 验收证据：`docs/devel/report/`、`docs/devel/assessment/`
 - 部署运维：`docs/guide/`（01 单机部署运维 / 02 测试环境部署）
