@@ -16,7 +16,8 @@
 - **[task/](task/README.md)** —— 任务细化卡（T 编号），每模块一份，是具体执行单元；
 - **[report/](report/README.md)** —— 阶段验收报告与机器证据记录；
 - **[env/](env/README.md)** —— 开发环境配置、缓存盘点与安全清理指南；
-- **[assessment/](assessment/README.md)** —— AI Agent 研发质量量化评估体系与报告。
+- **[assessment/](assessment/README.md)** —— AI Agent 研发质量量化评估体系与报告；
+- **[todo/](todo/README.md)** —— 待办与需求缓冲池，未入轨缺陷与需求的登记表（落地即移出，零沉淀）。
 
 当前状态：Phase 1 模拟底座与观察员控制台双线（M1–M16 / T01–T22）均已收口并通过终验。项目总览见根 [README.md](../../README.md)。
 
@@ -33,7 +34,8 @@ docs/devel/
 ├── task/              # 【任务规格】原子任务卡 T01–T22
 ├── report/            # 【阶段验收】M8 / M16 终验报告
 ├── env/               # 【环境治理】缓存依赖盘点与清理指南
-└── assessment/        # 【研发评估】Agent 评分标准、流程与报告
+├── assessment/        # 【研发评估】Agent 评分标准、流程与报告
+└── todo/              # 【待办缓冲】未入轨缺陷与需求登记表（落地即移出）
 ```
 
 ---
@@ -49,6 +51,7 @@ docs/devel/
 | **report/** | [report/README.md](report/README.md) | 包含 [01-M8-验收报告](report/01-M8-验收报告.md) 与 [02-M16-前端验收报告](report/02-M16-前端验收报告.md) | 阶段收口 |
 | **env/** | [env/README.md](env/README.md) | 包含 [01-环境缓存与依赖清理指南](env/01-环境缓存与依赖清理指南.md)，指导磁盘与缓存治理 | 现行有效 |
 | **assessment/** | [assessment/README.md](assessment/README.md) | 包含评分标准、执行流程与 AI Agent 研发质量评估最终报告 | 已定稿 |
+| **todo/** | [todo/README.md](todo/README.md) | 未入轨缺陷与需求的缓冲池（[now.md](todo/now.md)、[future.md](todo/future.md)），落地即移出、零沉淀 | 持续轮转 |
 
 ---
 
@@ -57,4 +60,5 @@ docs/devel/
 - **想要了解系统当下完整规则**：请直接阅读 [design/](design/README.md) 中的两份设计大稿；
 - **想要核验最新代码修复或功能回调**：请查看 [change/](change/README.md) 中的变更卡，直接核对三联前后对比表与人工 Checklist；
 - **想要查验历史交付质量与测试证据**：请查阅 [report/](report/README.md) 中的阶段验收报告或 [assessment/](assessment/README.md) 中的评估报告；
-- **想要定位特定模块的历史任务定义**：请通过 [plan/](plan/README.md) 的追踪矩阵跳转到对应的 [task/](task/README.md) 任务卡。
+- **想要定位特定模块的历史任务定义**：请通过 [plan/](plan/README.md) 的追踪矩阵跳转到对应的 [task/](task/README.md) 任务卡；
+- **想要登记或查看未入轨的缺陷与需求**：请查阅 [todo/](todo/README.md) 缓冲池，注意事项一旦建卡或落入设计即被物理移出。

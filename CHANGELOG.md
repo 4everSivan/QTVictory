@@ -76,3 +76,5 @@
 - **开发计划与任务卡**：18 篇里程碑计划（`docs/devel/plan/M1–M16`）与 22 篇任务细化卡（`docs/devel/task/T01–T22`）。
 - **终验报告**：[01-M8 后端验收报告.md](docs/devel/report/01-M8-验收报告.md) 与 [02-M16 前端验收报告.md](docs/devel/report/02-M16-前端验收报告.md)。
 - **环境治理**：[01-环境缓存与依赖清理指南.md](docs/devel/env/01-环境缓存与依赖清理指南.md)，规范磁盘缓存与依赖清理路径。
+- **待办缓冲池**：`docs/devel/todo/` 未入轨缺陷与需求登记（按版本分文件、落地即移出零沉淀、BG/EN/FT/TD 编号契约）。
+- **治理规则**：变更核收 AI 汇报 + 会话确认代签；design 章节、变更卡与 CHANGELOG 双向互链；测试环境《部署验收单》（`local/deployment-report.md`，现实绑定维护命令与 Cmd+点击前端入口）。

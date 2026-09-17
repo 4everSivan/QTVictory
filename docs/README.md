@@ -1,7 +1,7 @@
 # QTVictory 文档中心
 
 > **项目定位**: A 股实时前向仿真模拟交易系统（私人单机自部署）
-> **当前版本**: v0.1.1（Phase 1 · 模拟底座与观察员控制台）
+> **当前版本**: v0.1.0（Phase 1 · 模拟底座与观察员控制台）
 > **代码仓库**: [GitHub - 4everSivan/QTVictory](https://github.com/4everSivan/QTVictory)
 
 ---
@@ -21,7 +21,8 @@ docs/
 │   ├── task/           # T01–T22 模块执行与验收卡
 │   ├── report/         # M8 / M16 阶段终验报告
 │   ├── env/            # 开发环境依赖盘点与磁盘清理指南
-│   └── assessment/     # AI Agent 研发质量评估与证据体系
+│   ├── assessment/     # AI Agent 研发质量评估与证据体系
+│   └── todo/           # 待办与需求缓冲池（按版本分文件登记，落地即移出）
 │
 └── guide/              # 【用户与运维指南】面向使用者与部署运维
     ├── README.md       # guide 子目录索引
@@ -186,9 +187,10 @@ docs/
 ```
 
 #### ⑧ 待办与需求缓冲池（`docs/devel/todo/`）—— 缓冲池模型
-- **定位与契约**：`todo/` 作为项目未入轨事项的轻量缓冲池（Backlog Intake Queue），按版本拆分独立文件（如 [v0.1.0.md](devel/todo/v0.1.0.md)、[future.md](devel/todo/future.md)），支持多端/多 Agent 并行编辑，避免单一文件合并冲突；
+- **定位与契约**：`todo/` 作为项目未入轨事项的轻量缓冲池（Backlog Intake Queue），按当前版本与远期储备分设文件（[now.md](devel/todo/now.md)、[future.md](devel/todo/future.md)），支持多端/多 Agent 并行编辑，避免单一文件合并冲突；
 - **表格化呈现**：所有缺陷与功能一律采用标准 Markdown 表格记录，明确 ID、模块、描述、优先级/严重度、登记日期与流转目标；
 - **落地即移出（零沉淀纪律）**：只要事项落入 [change/](devel/change/README.md)（创建 C 卡）或 [design/](devel/design/README.md)（更新设计基线），**必须立即从 todo 表格中物理删除**；`todo/` 坚决不保留 `[x]` 历史勾选项，闭环与审计由 change/design 全权承载。
+- **编号与度量口径**：前缀语义（BG/EN/FT/TD）+ 四位序号只增不复用、严重度 S1–S4 与优先级 P0–P3 受控枚举、版本文件生命周期与标准表模板，详见 [todo/README.md](devel/todo/README.md) §2–§5。
 
 
 ---
