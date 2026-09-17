@@ -2,6 +2,7 @@
 reference/
 
 # ---- AI / Agent 工具产生的隐藏目录 ----
+.superpowers/
 .claude/
 .claude.*
 .cursor/
@@ -22,3 +23,19 @@ reference/
 **/.DS_Store
 ._.Thumbs
 Thumbs.db
+
+# ---- 后端构建产物与本地数据 ----
+backend/.venv/
+backend/data/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+**/.pytest_cache/
+*.pyc
+
+# ---- 前端构建产物与本地配置 ----
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.env
+*.tsbuildinfo

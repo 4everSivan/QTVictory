@@ -1,0 +1,155 @@
+/* 全局基础样式：01 §2.2 布局栅格 / §3 样式基线纪律 */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.price {
+  font-family: var(--font-price);
+}
+
+/* 语义色纪律（01 §3.2）：仅数值本体声明涨跌色，组件选择器不声明 color 覆盖 */
+.up {
+  color: var(--up);
+}
+.down {
+  color: var(--down);
+}
+.flat {
+  color: var(--txt2);
+}
+
+/* 一屏五区栅格（01 §2.2，v1 定稿） */
+.app {
+  display: grid;
+  height: 100vh;
+  grid-template-rows: 48px minmax(0, 1fr) 236px;
+  grid-template-columns: 262px minmax(0, 1fr) 324px;
+}
+
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.leftcol {
+  grid-row: 2 / 4;
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.leftcol .pane-watchlist {
+  flex: 1 1 55%;
+  min-height: 0;
+}
+
+.leftcol .pane-traders {
+  flex: 0 0 44%;
+  min-height: 0;
+  border-top: 1px solid var(--line);
+}
+
+.center {
+  grid-row: 2;
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.rightcol {
+  grid-row: 2;
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+}
+
+.rightcol .pane-orderbook {
+  flex: 1 1 56%;
+  min-height: 0;
+}
+
+.rightcol .pane-order {
+  flex: 0 0 44%;
+  min-height: 0;
+  border-top: 1px solid var(--line);
+}
+
+.dock {
+  grid-row: 3;
+  grid-column: 2 / -1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+/* 主题切换按钮（顶栏，T19 并入完整顶栏） */
+.theme-toggle {
+  margin-left: 12px;
+  background: none;
+  border: 1px solid var(--line2);
+  color: var(--txt2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+/* 占位 pane（T15）：仅标注区域名 */
+.pane-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 0;
+  color: var(--txt3);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+/* 响应式降级（01 §2.2：≤1180px 左 220 / 右 300） */
+@media (max-width: 1180px) {
+  .app {
+    grid-template-columns: 220px minmax(0, 1fr) 300px;
+  }
+}

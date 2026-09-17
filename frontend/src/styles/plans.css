@@ -1,0 +1,96 @@
+/* 计划面板与收益分析（01 §4.9/§4.10） */
+
+.plan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.plan-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+}
+
+.plan-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.plan-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.plan-head .tb-add {
+  margin-left: auto;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  font-size: 12px;
+}
+
+.plan-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plan-kv {
+  color: var(--txt2);
+}
+
+.plan-budget {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.water-bar {
+  height: 6px;
+  background: var(--raised);
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.water-fill {
+  height: 100%;
+  background: var(--acc);
+  transition: width 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.entry-form {
+  border-top: 1px dashed var(--line2);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analytics-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.dock-export {
+  background: none;
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  padding: 1px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--txt2);
+  margin-left: 8px;
+}
