@@ -43,9 +43,19 @@
 - 前端：`cd frontend && npm test`（Vitest 单测）+ `npm run build`（tsc + Vite 构建）
 - E2E：`node frontend/scripts/e2e.mjs`（Playwright 无头几何验收）
 
+## 测试环境（隔离红线）
+
+测试环境部署与运行细则见 [docs/guide/02-测试环境部署指南.md](docs/guide/02-测试环境部署指南.md)，以下为不可绕过的隔离红线：
+
+1. **产物收拢 `local/`**：测试产生的数据库、日志、框架缓存、截图与临时文件全部写入 `local/`（已 gitignore），严禁向 `backend/`、`frontend/` 源码树扩散脏文件。
+2. **资源隔离**：测试实例必须用 `QTV_PORT=8788`、`QTV_DB=local/data/qtvictory_test.db`，不得占用生产默认端口 `8787` 与 `backend/data/qtvictory.db`。
+3. **环境复用优先**：优先复用已激活虚拟环境 → `backend/.venv` → `local/.venv`，均无才在 `local/.venv` 新建。
+4. **长期保留**：测试环境默认长期保留，不随测试结束销毁；仅在需要时按指南第 8 章分级清理。
+
 ## 文档地图
 
 - 设计事实源：`docs/devel/design/`（01 前端 / 02 后端）
 - 变更核验：`docs/devel/change/`
 - 方向待办：`docs/devel/TODO.md`（仅方向级；缺陷与回调直接建 C 卡）
 - 验收证据：`docs/devel/report/`、`docs/devel/assessment/`
+- 部署运维：`docs/guide/`（01 单机部署运维 / 02 测试环境部署）

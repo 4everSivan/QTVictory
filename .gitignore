@@ -27,10 +27,16 @@ Thumbs.db
 # ---- 后端构建产物与本地数据 ----
 backend/.venv/
 backend/data/
+.venv/
 __pycache__/
 **/__pycache__/
 .pytest_cache/
 **/.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 *.pyc
 
 # ---- 前端构建产物与本地配置 ----
@@ -38,4 +44,31 @@ frontend/node_modules/
 frontend/dist/
 frontend/coverage/
 frontend/.env
+frontend/playwright-report/
+frontend/test-results/
+frontend/*.tsbuildinfo
 *.tsbuildinfo
+
+# ---- 环境变量与密钥（模板豁免） ----
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# ---- 运行日志与本地数据库 ----
+*.log
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ---- 编辑器与 IDE ----
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ---- 本地测试与运行隔离目录 ----
+local/
