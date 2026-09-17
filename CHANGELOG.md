@@ -6,6 +6,13 @@
 
 ---
 
+## [0.1.1] - 2026-09-17
+
+### 修复 (Fixed)
+- **日K 引导入库元组缺 code 导致 klines 表永空**：`TencentAdapter.fetch_daily_klines` 返回 6 元组与 `DataStore.upsert_klines` 的 7 元组契约不匹配，启动引导静默失败，前端"日K"页签永远空白。已对齐为 7 元组契约并补适配器→store 契约回归测试。详见变更卡 [C001](docs/devel/change/C001-修复日K引导入库元组缺code.md)。
+
+---
+
 ## [0.1.0] - 2026-09-17
 
 ### 概述 (Overview)

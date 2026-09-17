@@ -25,8 +25,10 @@ function check(name, cond, extra = '') {
 const server = await createServer({ root: process.cwd(), server: { port: 4312 } })
 await server.listen()
 
+const backendPort = process.env.QTV_PORT || 8787
+
 // 造一个验收用交易员（结束后软删还原空世界）
-const created = await fetch('http://127.0.0.1:8787/api/traders', {
+const created = await fetch(`http://127.0.0.1:${backendPort}/api/traders`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ name: 'e2e验收', mode: 'manual', initCash: 1_000_000 }),
@@ -128,7 +130,7 @@ check('降级断口 console 零报错', smallErr.length === 0, JSON.stringify(sm
 
 await browser.close()
 await server.close()
-await fetch(`http://127.0.0.1:8787/api/traders/${probeTraderId}`, { method: 'DELETE' })
+await fetch(`http://127.0.0.1:${backendPort}/api/traders/${probeTraderId}`, { method: 'DELETE' })
 
 console.log('\ngeometry@1560x940:', JSON.stringify(results.main.geo))
 console.log(`e2e: ${passed} passed, ${failed} failed`)

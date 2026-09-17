@@ -106,7 +106,7 @@ class TencentAdapter:
         return parse_quote_payload(resp.content.decode("gbk", errors="replace"))
 
     async def fetch_daily_klines(self, code: str, limit: int = 320) -> list[tuple]:
-        """日K（前复权）：[(date, open, close, high, low, volume)]。"""
+        """日K（前复权）：[(code, date, open, close, high, low, volume)]。"""
         resp = await self.client.get(
             KLINE_URL, params={"param": f"{code},day,,,{limit},qfq"}
         )
@@ -116,7 +116,7 @@ class TencentAdapter:
         out: list[tuple] = []
         for row in rows:
             # [date, open, close, high, low, volume, ...]
-            out.append((row[0], float(row[1]), float(row[2]), float(row[3]),
+            out.append((code, row[0], float(row[1]), float(row[2]), float(row[3]),
                         float(row[4]), int(float(row[5]))))
         return out
 

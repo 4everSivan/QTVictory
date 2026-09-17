@@ -1,6 +1,6 @@
 [project]
 name = "qtvictory-backend"
-version = "0.1.0"
+version = "0.1.1"
 description = "QTVictory backend — A-share real-time paper-trading simulator (02 design v3)"
 requires-python = ">=3.11"
 dependencies = [

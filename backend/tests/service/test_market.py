@@ -1,6 +1,6 @@
 """T06：腾讯解析 / ΔV 差分 / 降级状态 / 分钟累积 / 交易日历推定。"""
 
-from app.adapters.tencent import NormalizedQuote, parse_quote_payload
+from app.adapters.tencent import NormalizedQuote, TencentAdapter, parse_quote_payload
 from tests.harness import inject, make_app, quote
 
 
@@ -123,3 +123,60 @@ class TestMarketRuntime:
             assert "600519" in ctx.market.watchlist()  # 持仓并入关注集
         finally:
             await ctx.stop()
+
+
+class TestKlineBootstrapContract:
+    """C001 回归：适配器输出 → upsert_klines → klines_for 全链路契约。"""
+
+    class _Resp:
+        def __init__(self, body):
+            self._body = body
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._body
+
+    class _Client:
+        def __init__(self, body):
+            self._body = body
+
+        async def get(self, url, params=None):
+            return TestKlineBootstrapContract._Resp(self._body)
+
+    async def _fetch(self, code: str, body) -> list:
+        return await TencentAdapter(self._Client(body)).fetch_daily_klines(code)
+
+    async def test_rows_roundtrip_into_store(self):
+        """股票源 qfqday 7 元组落库后可读回（元组维度漂移即在此暴露）。"""
+        body = {"data": {"sh600519": {"qfqday": [
+            ["2026-09-15", "1680.00", "1685.00", "1690.00", "1675.00", "25000.00"],
+            ["2026-09-16", "1685.00", "1678.00", "1691.00", "1670.00", "26235.00"],
+        ]}}}
+        rows = await self._fetch("sh600519", body)
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            ctx.market.sync_klines(rows)
+            got = ctx.store.klines_for("sh600519", limit=10)
+        finally:
+            await ctx.stop()
+        assert [r["date"] for r in got] == ["2026-09-15", "2026-09-16"]
+        assert got[-1]["close"] == 1678.0 and got[-1]["volume"] == 26235
+
+    async def test_index_day_key_fallback(self):
+        """指数无 qfqday 键，day 键同样按 7 元组契约落库。"""
+        body = {"data": {"sh000300": {"day": [
+            ["2026-09-16", "4449.880", "4480.270", "4483.360", "4417.600", "142000000.000"],
+        ]}}}
+        rows = await self._fetch("sh000300", body)
+        assert rows == [("sh000300", "2026-09-16", 4449.88, 4480.27, 4483.36, 4417.6, 142000000)]
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            ctx.market.sync_klines(rows)
+            got = ctx.store.klines_for("sh000300", limit=1)
+        finally:
+            await ctx.stop()
+        assert len(got) == 1
