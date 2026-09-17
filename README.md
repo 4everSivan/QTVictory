@@ -3,7 +3,7 @@
 **面向量化交易系统的模拟底座** —— 以真实行情与 A 股规则级撮合构建的实时前向仿真环境。
 **A real-time paper-trading simulator with rule-level A-share matching, evolving from a simulation base into a personal quantitative trading system.**
 
-> **当前状态：设计定稿，实现进行中。** 本文呈现的是目标形态与架构蓝图，功能尚未实现；各模块进度见 [当前进度](#当前进度)。
+> **当前状态：Phase 1「模拟底座」整体收口——后端已通过验收（[M8 验收报告](docs/devel/report/01-M8-验收报告.md)，131 测试全绿 + 四项性能达标）；Web 控制台已按 [01 设计 v2.1](docs/devel/design/01-前端设计方案.md) 完成生产实现并通过联调验收（[M16 前端验收报告](docs/devel/report/02-M16-前端验收报告.md)：133 测试 + 数据层冒烟 11 项 + 无头浏览器实测 19 项全绿）。** 各模块进度见 [当前进度](#当前进度)。
 
 ---
 
@@ -61,13 +61,21 @@ QTVictory 用**真实行情**（腾讯/东财公开接口轮询）和**真实交
 - 默认免鉴权（纯私人本机定位，启动日志告警）；可选 `QTV_API_KEY` 启用观察员凭证；
 - 全部行为经 `QTV_*` 环境变量配置（轮询间隔、量约束比例、分红税率、限速等）。
 
-> 可执行的快速开始命令将在 Phase 1 首个可运行版本落地后补充。
+### 快速开始（后端）
+
+```bash
+cd backend
+uv venv .venv --python 3.13   # 或任何 ≥3.11
+uv pip install --python .venv/bin/python fastapi 'uvicorn[standard]' httpx pydantic pydantic-settings pytest pytest-asyncio
+.venv/bin/python -m pytest tests/        # 131 个测试
+.venv/bin/python -m app.main             # 默认 127.0.0.1:8787，OpenAPI 见 /api/docs
+```
 
 ## 路线图
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| **Phase 1 · 模拟底座** | 实时前向仿真：行情采集与降级、规则级撮合、观察员-交易员体系、计划引擎、绩效统计与导出、Web 控制台 —— 即两份设计稿的完整范围 | **进行中（设计定稿）** |
+| **Phase 1 · 模拟底座** | 实时前向仿真：行情采集与降级、规则级撮合、观察员-交易员体系、计划引擎、绩效统计与导出、Web 控制台 —— 即两份设计稿的完整范围 | **已完成（后端 [M8 验收](docs/devel/report/01-M8-验收报告.md) + 前端 [M16 验收](docs/devel/report/02-M16-前端验收报告.md)）** |
 | **Phase 2 · 策略研究闭环** | 历史回测引擎（K 线重放）与策略迭代工具链；模拟底座已为其预留统一规则内核与评估口径 | 规划中 |
 | **Phase 3 · 私人实盘** | 对接券商实盘通道，仅限本人使用 | 愿景 |
 
@@ -77,14 +85,17 @@ Phase 2/3 的范围以届时设计稿为准。
 
 | 模块 | 设计稿 | 状态 |
 |---|---|---|
-| 行情服务 MarketService | [02](docs/devel/design/02-后端设计方案.md) §3.4 | 设计定稿 |
-| 交易员服务 TraderService | [02](docs/devel/design/02-后端设计方案.md) §3.5 | 设计定稿 |
-| 交易服务 / 撮合引擎 TradingService | [02](docs/devel/design/02-后端设计方案.md) §3.6 / §6.1 | 设计定稿 |
-| 交易计划服务 PlanService | [02](docs/devel/design/02-后端设计方案.md) §3.7 / §6.7 | 设计定稿 |
-| 统计服务 MetricsService | [02](docs/devel/design/02-后端设计方案.md) §3.8 / §6.9 | 设计定稿 |
-| 导出服务 ExportService | [02](docs/devel/design/02-后端设计方案.md) §3.8 / §6.8 | 设计定稿 |
-| 会话服务 SessionService | [02](docs/devel/design/02-后端设计方案.md) §3.9 / §6.4 | 设计定稿 |
-| Web 控制台 | [01](docs/devel/design/01-前端设计方案.md) 全文（v2） | 设计定稿 |
+| 工程骨架 / 持久层 | [02](docs/devel/design/02-后端设计方案.md) §4 / §6.2 | **已实现**（[plan](docs/devel/plan/00-总体开发计划.md)） |
+| 行情服务 MarketService | [02](docs/devel/design/02-后端设计方案.md) §3.4 | **已实现**（公司行动采集钩子待 03 详细设计，处理逻辑已全实现） |
+| 交易员服务 TraderService | [02](docs/devel/design/02-后端设计方案.md) §3.5 | **已实现** |
+| 交易服务 / 撮合引擎 TradingService | [02](docs/devel/design/02-后端设计方案.md) §3.6 / §6.1 | **已实现**（A 股规则级全量断言通过） |
+| 交易计划服务 PlanService | [02](docs/devel/design/02-后端设计方案.md) §3.7 / §6.7 | **已实现** |
+| 统计服务 MetricsService | [02](docs/devel/design/02-后端设计方案.md) §3.8 / §6.9 | **已实现** |
+| 导出服务 ExportService | [02](docs/devel/design/02-后端设计方案.md) §3.8 / §6.8 | **已实现** |
+| 会话服务 SessionService | [02](docs/devel/design/02-后端设计方案.md) §3.9 / §6.4 | **已实现**（日切幂等 + 公司行动） |
+| REST / WebSocket / 横切中间件 | [02](docs/devel/design/02-后端设计方案.md) §5 | **已实现**（鉴权/幂等/限速/审计矩阵通过） |
+| 验收 | [02](docs/devel/design/02-后端设计方案.md) §6.12 | **已通过**（[M8 验收报告](docs/devel/report/01-M8-验收报告.md)：131 测试 + 四项性能达标） |
+| Web 控制台 | [01](docs/devel/design/01-前端设计方案.md) 全文（v2.1） | **已实现并通过联调验收**（[M16 前端验收报告](docs/devel/report/02-M16-前端验收报告.md)：133 测试 + 冒烟 11 项 + 浏览器实测 19 项全绿；§12 候选项未做，登记于报告 §7） |
 | 交互原型（样式基线 v1） | [01](docs/devel/design/01-前端设计方案.md) §11 | 已完成实测（本地留存，未入库） |
 
 ## 关键设计决策
@@ -97,12 +108,15 @@ Phase 2/3 的范围以届时设计稿为准。
 - **默认免鉴权**（Q4）——纯私人本机使用，仅监听 127.0.0.1 并日志告警；`QTV_API_KEY` 可选启用。不为单人场景引入账户体系。
 - **事件通道 = WS 主路 + REST 轮询兜底，不做 Webhook**（Q6）——纯本机部署下外部程序主动连 WS 最自然；反向回调的注册/重试/签名复杂度无收益。
 
-## 设计文档
+## 开发文档
 
 | 文档 | 版本 | 内容 |
 |---|---|---|
-| [docs/devel/design/01-前端设计方案.md](docs/devel/design/01-前端设计方案.md) | v2 | 观察员控制台：布局、组件规格、图表规格、数据层 |
+| [docs/devel/design/01-前端设计方案.md](docs/devel/design/01-前端设计方案.md) | v2.1 | 观察员控制台：布局、组件规格、图表规格、数据层 |
 | [docs/devel/design/02-后端设计方案.md](docs/devel/design/02-后端设计方案.md) | v3 | 领域模型、A 股规则级撮合、计划引擎、API 设计、Schema、测试验收 |
+| [docs/devel/plan/00-总体开发计划.md](docs/devel/plan/00-总体开发计划.md) | v1 | 后端开发计划：里程碑 M1–M8、追踪矩阵、进度汇总 |
+| [docs/devel/task/](docs/devel/task/) | v1 | 任务细化 T01–T14（每模块一份：条目/验收标准/DoD） |
+| [docs/devel/report/01-M8-验收报告.md](docs/devel/report/01-M8-验收报告.md) | — | 后端验收：§6.12 勾稽、性能基准、UI↔API 对照 |
 
 后续待出：`03-数据与行情接入详细设计`、`04-部署运维手册`。
 
