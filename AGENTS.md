@@ -1,0 +1,51 @@
+# AGENTS.md
+
+> QTVictory 协作红线 —— 给 AI Agent 与贡献者的流程底线。完整文档规范见 [docs/README.md](docs/README.md) §3。
+
+## 流程红线（不可绕过）
+
+1. **变更先行卡**：Bug 修复 / 功能回调 / 参数调整 / 接口微调，先在 `docs/devel/change/` 复制 `template.md` 建 `C00x` 变更卡，再动代码；严禁跳过。
+2. **任务卡只读**：`docs/devel/task/` 与 `docs/devel/plan/` 已随 Phase 1 封存归档，一律不修改；Phase 2 立项才可在 plan/task 新建卡片。
+3. **design 活基线**：变更涉及设计规则时，同步修订 `docs/devel/design/` 对应章节（保持全文自洽），文末变更记录增补条目并回链 C 编号，头部"关联变更"追加 C 编号。
+4. **CHANGELOG 同步**：核验通过的 C 卡按 semver 记账（规则见 [docs/README.md](docs/README.md) §3.3）。
+5. **元数据契约**：文档头部引用块 `**键名**: 值 ｜ 键值`——半角冒号加单空格、全角竖线分隔、状态枚举纯净（禁括号小尾巴）、日期 ISO `YYYY-MM-DD`。
+6. **锚点纪律**：章节号只增不插中间；废弃章节原位保留并标注 `[已废弃]`，编号不复用。
+
+## 入口流程
+
+两类工作各走一条链路，共同遵守：文档先行 → 开发 → 测试 → 验收，每步产出落在对应目录，不跨步、不省略。
+
+### 功能设计入口（新功能 / 新 Phase 立项）
+
+1. **方向登记**：在 `docs/devel/TODO.md` 登记方向级事项（仅方向，不写实现细节）。
+2. **设计稿先行**：在 `docs/devel/design/` 新增或修订对应章节，头部状态从 `讨论中` 起步，评审通过后改 `现行基线`。
+3. **立项拆解**：在 `docs/devel/plan/` 新建 M 卡、`docs/devel/task/` 新建 T 卡（编号只增不插）；Phase 2 起才允许新建，Phase 1 卡片已封存。
+4. **开发**：按 T 卡范围与 DoD 执行，不超范围。
+5. **测试**：跑下方"测试命令"全部适用项，结果写入验收材料。
+6. **验收**：在 `docs/devel/report/` 新建验收报告（结论枚举：通过 / 受限通过 / 未通过）。
+7. **收口**：验收通过的 T 卡冻结为只读；按 §3.3 同步 `CHANGELOG` 与版本号，打对应 `git tag`。
+
+### Bug 修复入口（缺陷 / 功能回调 / 参数调整）
+
+1. **建卡**：在 `docs/devel/change/` 复制 `template.md` 建 `C00x`（编号只增），类型枚举：BugFix / Rollback / Refactor / Param。
+2. **对比表与 Checklist**：卡内填前后对比表，列清影响面与回滚方式。
+3. **改代码 + 补测试**：实现修复并补回归测试，跑下方"测试命令"。
+4. **同步 design**：涉及设计规则时修订 `docs/devel/design/` 对应章节（红线 3）。
+5. **人工核验签署**：卡状态 `待核验` → `核验通过` / `核验驳回`；核验人须人工签署，不接受 AI 自签。
+6. **合入**：核验通过后才允许合入主干。
+7. **回写闭环**：design 文末变更记录增补条目并回链 C 编号、头部"关联变更"追加；按 §3.3 记 `CHANGELOG`、需要时打 `git tag`。
+
+细则与状态枚举：变更卡见 [docs/devel/change/README.md](docs/devel/change/README.md)；六类目录契约见 [docs/README.md](docs/README.md) §3。
+
+## 测试命令（核验必跑）
+
+- 后端：`cd backend && pytest`
+- 前端：`cd frontend && npm test`（Vitest 单测）+ `npm run build`（tsc + Vite 构建）
+- E2E：`node frontend/scripts/e2e.mjs`（Playwright 无头几何验收）
+
+## 文档地图
+
+- 设计事实源：`docs/devel/design/`（01 前端 / 02 后端）
+- 变更核验：`docs/devel/change/`
+- 方向待办：`docs/devel/TODO.md`（仅方向级；缺陷与回调直接建 C 卡）
+- 验收证据：`docs/devel/report/`、`docs/devel/assessment/`
