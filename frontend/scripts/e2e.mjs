@@ -111,6 +111,8 @@ const ordersTab = await main.page.$('[data-testid="dock-orders"]')
 check('Dock 委托 Tab 可切换', Boolean(ordersTab))
 
 const themeBtn = await main.page.$('.theme-toggle')
+const switcherNameColor = await main.page.$eval('.switcher-name', (el) => getComputedStyle(el).color)
+check('交易员切换器名称为主文本色（C006：非 UA 默认黑）', switcherNameColor === 'rgb(232, 232, 232)', `got ${switcherNameColor}`)
 check('顶栏主题切换按钮存在（默认深色）', Boolean(themeBtn) && (await main.page.$eval('.theme-toggle', (el) => el.textContent)) === '深色')
 await main.page.click('.theme-toggle')
 await main.page.waitForTimeout(200)
