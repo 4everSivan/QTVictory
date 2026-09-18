@@ -67,6 +67,20 @@ describe('REST client（02 §5.1 统一错误模型）', () => {
     expect(JSON.parse(init.body as string).name).toBe('T')
   })
 
+  it('PUT 方法（自选股单码添加，T24）', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => '{"code":"sh600519","addedAt":"2026-09-18T14:00:00","created":true,"name":"贵州茅台"}',
+    })
+    const data = await api.put<{ code: string; created: boolean }>('/watchlist/600519')
+    expect(data.code).toBe('sh600519')
+    expect(data.created).toBe(true)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/api/watchlist/600519')
+    expect((init as RequestInit).method).toBe('PUT')
+  })
+
   it('download：成功取 blob 并触发下载', async () => {
     const click = vi.fn()
     vi.spyOn(document, 'createElement').mockReturnValue({ click, href: '', download: '' } as unknown as HTMLAnchorElement)

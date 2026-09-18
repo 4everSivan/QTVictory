@@ -96,7 +96,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.method not in ("POST", "PATCH", "DELETE"):
+        if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
             return await call_next(request)
         idem_key = request.headers.get("Idempotency-Key")
         if not idem_key:

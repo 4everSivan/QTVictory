@@ -255,6 +255,38 @@ export interface Template {
   params: Record<string, TemplateParam>
 }
 
+/* ---- 自选股（T23/T24，02 §5.2 v6：码制为带市场前缀规范码） ------------ */
+
+export interface WatchEntry {
+  code: string
+  addedAt: string
+}
+
+export interface WatchAddResult {
+  code: string
+  addedAt: string
+  created: boolean
+  name?: string
+}
+
+export interface WatchRemoveResult {
+  code: string
+  removed: boolean
+}
+
+export interface WatchBatchReceipt {
+  code: string
+  op: 'add' | 'remove'
+  ok: boolean
+  error: string | null
+}
+
+export interface SuggestItem {
+  code: string
+  name: string
+  kind: string
+}
+
 /* ---- 请求体（与 backend models.schemas 对齐） --------------------- */
 
 export interface TraderCreate {

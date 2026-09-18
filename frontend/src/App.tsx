@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Dock } from './components/panes/Dock'
 import { OrderBook } from './components/panes/OrderBook'
 import { OrderPanel } from './components/panes/OrderPanel'
@@ -17,12 +17,14 @@ import type {
   ServerFrame,
   SessionState,
   Quote,
+  WatchEntry,
 } from './api/types'
 import { quoteQuality } from './api/types'
 import {
   ingestQuotesEnvelope,
   useMarketSelection,
 } from './state/marketData'
+import { arrangeWatchRows } from './state/watchlist'
 import { isIndexCode } from './lib/format'
 import { cycleMode, getMode, type ThemeMode } from './theme'
 
@@ -47,6 +49,7 @@ function Shell() {
 
   const sessionQuery = useQuery<SessionState>('/session')
   const quotesQuery = useQuery<QuotesEnvelope>('/market/quotes')
+  const watchQuery = useQuery<{ data: WatchEntry[] }>('/watchlist')
   const quotesFrame = useSubscription<QuotesFrame>('quotes')
 
   const envelope = quotesFrame?.data ?? quotesQuery.data ?? null
@@ -69,6 +72,13 @@ function Shell() {
   const quotes = envelope?.quotes ?? []
   const quote = quotes.find((q) => q.code === selected) ?? null
   const quality = envelope ? quoteQuality(envelope) : 'fallback'
+  // 列表编排（T24-1）：自选集置顶（addedAt 倒序）+ 动态项保持关注集原序
+  const watchEntries = watchQuery.data?.data ?? []
+  const watchRows = useMemo(
+    () => arrangeWatchRows(quotes, watchEntries),
+    [quotes, watchEntries],
+  )
+  const reloadWatchlist = useCallback(() => void watchQuery.reload(), [watchQuery])
 
   return (
     <div className="app">
@@ -84,7 +94,7 @@ function Shell() {
       </header>
       <aside className="leftcol">
         <section className="pane-watchlist">
-          <WatchList quotes={quotes} selected={selected} onSelect={setSelected} />
+          <WatchList rows={watchRows} selected={selected} onSelect={setSelected} onChanged={reloadWatchlist} />
         </section>
         <section className="pane-traders">
           <TraderBoard />

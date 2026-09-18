@@ -5,8 +5,8 @@
   透出 source/live；新浪档含五档与累计量，视同主源完整档；
 - 内存最新档（MarketBus）+ ΔV 差分 + 停牌标志 + 新鲜度时钟（>30s）；
 - 日K 全量启动拉取（腾讯 ifzq → 东财 push2his 兜底）+ 每日增量；
-  分钟线当日累积、日切落库；
-- 交易日历由快照时间戳推定；关注代码集 = 持仓 ∪ 计划池 ∪ 指数。
+  分钟线当日累积、日切落库；新增自选码异步单码引导（T23，串行排队）；
+- 交易日历由快照时间戳推定；关注代码集 = 自选 ∪ 持仓 ∪ 计划池 ∪ 指数。
 
 测试经 inject / sync_klines 离线注入（不触网）。
 """
@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -27,6 +28,8 @@ from app.domain.engine import BookLevel, Tick
 log = logging.getLogger("qtv.market")
 
 INDEX_CODES = ["sh000300"]
+
+_SUGGEST_TTL_SEC = 30.0  # 联想结果服务端短缓存（§3.10）
 
 
 class MarketService:
@@ -44,6 +47,9 @@ class MarketService:
         self._minute_bars: dict[tuple[str, str], tuple[float, int]] = {}
         self._minute_date: str = ""
         self._watch_override: set[str] | None = None
+        self._kline_boot_lock = asyncio.Lock()      # 自选码日K 引导串行排队（T23-3）
+        self._kline_boot_tasks: set[asyncio.Task] = set()
+        self._suggest_cache: dict[str, tuple[float, list[dict[str, str]]]] = {}
         self._client: Any = None
         self._tencent: TencentAdapter | None = None
         self._sina: SinaAdapter | None = None
@@ -70,6 +76,10 @@ class MarketService:
                 await self._task
             except asyncio.CancelledError:
                 pass
+        for task in self._kline_boot_tasks:
+            task.cancel()
+        if self._kline_boot_tasks:
+            await asyncio.gather(*self._kline_boot_tasks, return_exceptions=True)
         if self._client is not None:
             await self._client.aclose()
 
@@ -78,11 +88,12 @@ class MarketService:
         self._watch_override = set(codes) if codes is not None else None
 
     def watchlist(self) -> list[str]:
-        """关注代码集：持仓 ∪ 计划池 ∪ 指数（02 §3.4）。"""
+        """关注代码集：自选 ∪ 持仓 ∪ 计划池 ∪ 指数（02 §3.4，v6 并入自选集）。"""
         if self._watch_override is not None:
             return sorted(self._watch_override | set(INDEX_CODES))
         store = self.ctx.store
         codes: set[str] = set(INDEX_CODES)
+        codes.update(store.watchlist_codes())
         for pos in store.positions_all():
             codes.add(pos["code"])
         for trader in store.list_traders():
@@ -255,19 +266,73 @@ class MarketService:
 
     # -- K 线 / 分钟线 / 公司行动 ------------------------------------------
 
+    async def _fetch_daily_chain(self, code: str) -> list[tuple]:
+        """日K 链路：腾讯 ifzq → 东财 push2his 兜底（C008 同款，量纲一致）。"""
+        try:
+            return await self._tencent.fetch_daily_klines(code)
+        except Exception:
+            if self._eastmoney is None:
+                raise
+            return await self._eastmoney.fetch_daily_klines(code)
+
     async def _bootstrap_klines(self) -> None:
         try:
             for code in self.watchlist():
-                try:
-                    rows = await self._tencent.fetch_daily_klines(code)
-                except Exception:
-                    # C008：K线兜底——东财 push2his（前复权日K，量纲与腾讯一致）
-                    rows = await self._eastmoney.fetch_daily_klines(code)
+                rows = await self._fetch_daily_chain(code)
                 if rows:
                     await asyncio.to_thread(self.ctx.store.upsert_klines, rows)
             log.info("kline bootstrap done")
         except Exception:
             log.exception("kline bootstrap failed")
+
+    def trigger_kline_bootstrap(self, code: str) -> asyncio.Task | None:
+        """新增自选成功后异步引导该码日K（T23-3：单码粒度、串行排队、
+        失败不阻塞添加回执）；offline 无网络不引导。返回任务便于测试等待。"""
+        if self._tencent is None:
+            return None
+        task = asyncio.create_task(self._bootstrap_kline_one(code),
+                                   name=f"kline-boot-{code}")
+        self._kline_boot_tasks.add(task)
+        task.add_done_callback(self._kline_boot_tasks.discard)
+        return task
+
+    async def _bootstrap_kline_one(self, code: str) -> None:
+        async with self._kline_boot_lock:  # 批量添加时引导串行排队
+            try:
+                rows = await self._fetch_daily_chain(code)
+                if rows:
+                    await asyncio.to_thread(self.ctx.store.upsert_klines, rows)
+            except Exception:
+                log.warning("kline bootstrap for %s failed", code, exc_info=True)
+
+    # -- 自选股支撑（T23）：快照探测与名称联想 ---------------------------------
+
+    async def probe_code(self, code: str) -> NormalizedQuote | None:
+        """单码快照可达性探测（WatchlistService 校验用）；offline 恒 None。"""
+        if self._tencent is None:
+            return None
+        quotes = await self._tencent.fetch_quotes([code])
+        return quotes[0] if quotes else None
+
+    async def suggest(self, q: str) -> list[dict[str, str]]:
+        """名称联想（T23-4）：腾讯 smartbox 代理 + 服务端短缓存；
+        上游故障返回空列表（联想场景不阻断前端）。"""
+        key = q.strip()
+        if not key or self._tencent is None:
+            return []
+        now = time.monotonic()
+        hit = self._suggest_cache.get(key)
+        if hit is not None and now - hit[0] < _SUGGEST_TTL_SEC:
+            return hit[1]
+        try:
+            rows = await self._tencent.fetch_suggest(key)
+        except Exception:
+            log.warning("suggest upstream failed for %r", q, exc_info=True)
+            return []
+        if len(self._suggest_cache) > 512:
+            self._suggest_cache.clear()
+        self._suggest_cache[key] = (now, rows)
+        return rows
 
     def sync_klines(self, rows: list[tuple]) -> None:
         """增量/测试注入：[(code, date, open, close, high, low, volume)]。"""

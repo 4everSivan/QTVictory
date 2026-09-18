@@ -586,6 +586,55 @@ class Store:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    # -- watchlist (T23) ---------------------------------------------------
+
+    def watchlist_all(self) -> list[dict[str, Any]]:
+        """自选集全量（added_at 倒序，§5.2）。"""
+        with self.db.lock:
+            rows = self.db.conn.execute(
+                "SELECT code, added_at FROM watchlist ORDER BY added_at DESC, code"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def watchlist_codes(self) -> list[str]:
+        with self.db.lock:
+            rows = self.db.conn.execute("SELECT code FROM watchlist").fetchall()
+        return [r["code"] for r in rows]
+
+    def watchlist_get_any(self, codes: list[str]) -> dict[str, Any] | None:
+        """候选码（同一标的的写法变体）中首个已收录行。"""
+        with self.db.lock:
+            for code in codes:
+                row = self.db.conn.execute(
+                    "SELECT code, added_at FROM watchlist WHERE code = ?", (code,)
+                ).fetchone()
+                if row is not None:
+                    return dict(row)
+        return None
+
+    def watchlist_add(self, code: str, added_at: str) -> None:
+        with self.db.lock:
+            self.db.conn.execute(
+                "INSERT OR IGNORE INTO watchlist(code, added_at) VALUES(?, ?)",
+                (code, added_at),
+            )
+            self.db.conn.commit()
+
+    def watchlist_remove(self, codes: list[str]) -> str | None:
+        """删除候选码中首个命中行；返回实际删除的码（未命中为 None，幂等）。"""
+        removed: str | None = None
+        with self.db.lock:
+            for code in codes:
+                cur = self.db.conn.execute(
+                    "DELETE FROM watchlist WHERE code = ?", (code,)
+                )
+                if cur.rowcount:
+                    removed = code
+                    break
+            if removed is not None:
+                self.db.conn.commit()
+        return removed
+
     # -- audit / idempotency ----------------------------------------------
 
     def insert_audit(

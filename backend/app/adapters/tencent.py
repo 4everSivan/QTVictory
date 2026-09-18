@@ -9,12 +9,25 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 QUOTE_URL = "https://qt.gtimg.cn/q="
 QUOTE_URL_HTTP = "http://qt.gtimg.cn/q="
 KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+SUGGEST_URL = "https://smartbox.gtimg.cn/s3/"
+
+# smartbox 类别归一（T23-4）：GP-A/GP-B→stock、ZS→index，其余小写透传（ETF/LOF/…）
+_SUGGEST_KINDS = {"gp-a": "stock", "gp-b": "stock", "zs": "index"}
+
+# smartbox hint 名称字段以字面 \uXXXX 转义承载中文（C009），还原为 Unicode 字符；
+# 无转义的直编码中文原样通过
+_UESC = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+def _unescape_name(s: str) -> str:
+    return _UESC.sub(lambda m: chr(int(m.group(1), 16)), s)
 
 # 字段位（0 起）：3 现价 4 昨收 5 今开 6 成交量 30 时间 33 最高 34 最低 47 涨停 48 跌停
 # 9–18 买一~买五（价/量交替），19–28 卖一~卖五（价/量交替），36 成交量(手) 37 成交额(万)
@@ -93,6 +106,33 @@ def parse_quote_payload(text: str) -> list[NormalizedQuote]:
     return quotes
 
 
+def parse_suggest_payload(text: str) -> list[dict[str, str]]:
+    """解析 smartbox v2 联想响应为规范化 [{code, name, kind}]（T23-4）。
+
+    原始格式：`v_hint="sh~600519~贵州茅台~gzmt~GP-A^sz~000001~平安银行~payh~GP-A";`，
+    条目间 `^`、字段间 `~`（市场/代码/名称/拼音/类别）；无结果返回 `v_hint="N";`。
+    code 输出为带市场前缀的规范码（与 watchlist 落库口径一致）。
+    """
+    body = text.strip().rstrip(";")
+    if "=" not in body:
+        return []
+    body = body.split("=", 1)[1].strip().strip('"')
+    if not body or body == "N":
+        return []
+    out: list[dict[str, str]] = []
+    for item in body.split("^"):
+        fields = item.split("~")
+        if len(fields) < 3 or not fields[0] or not fields[1]:
+            continue
+        kind = fields[4].lower() if len(fields) > 4 else ""
+        out.append({
+            "code": f"{fields[0]}{fields[1]}",
+            "name": _unescape_name(fields[2]),
+            "kind": _SUGGEST_KINDS.get(kind, kind),
+        })
+    return out
+
+
 class TencentAdapter:
     """网络请求封装（解析逻辑在纯函数中，可离线测试）。"""
 
@@ -131,3 +171,9 @@ class TencentAdapter:
         （数据可经 corporate_actions 表写入；处理逻辑见 SessionService）。
         03 号详细设计文档若给出接口，在此接入。"""
         return []
+
+    async def fetch_suggest(self, q: str) -> list[dict[str, str]]:
+        """名称联想（T23-4）：smartbox v2，GBK 解码，规范化 [{code, name, kind}]。"""
+        resp = await self.client.get(SUGGEST_URL, params={"v": "2", "q": q, "t": "gp"})
+        resp.raise_for_status()
+        return parse_suggest_payload(resp.content.decode("gbk", errors="replace"))

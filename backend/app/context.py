@@ -30,6 +30,7 @@ class AppContext:
         from app.services.session import SessionService
         from app.services.trader import TraderService
         from app.services.trading import TradingService
+        from app.services.watchlist import WatchlistService
 
         self.settings = settings or Settings()
         self.clock = clock or Clock()
@@ -45,6 +46,7 @@ class AppContext:
         self.plans = PlanService(self)
         self.metrics = MetricsService(self)
         self.exporter = ExportService(self)
+        self.watchlist = WatchlistService(self)
 
     async def start(self) -> None:
         # 1) 持久层：连接 + 迁移（幂等）

@@ -19,6 +19,7 @@ from app.api.middleware import (
 from app.api.routes_market import router as market_router
 from app.api.routes_meta import router as meta_router
 from app.api.routes_traders import router as traders_router
+from app.api.routes_watchlist import router as watchlist_router
 from app.api.ws import WSHub, ws_endpoint
 from app.context import AppContext
 from app.errors import BizError
@@ -86,6 +87,7 @@ def create_app(settings=None, clock=None, offline: bool = False) -> FastAPI:
     app.include_router(meta_router, prefix="/api")
     app.include_router(market_router, prefix="/api")
     app.include_router(traders_router, prefix="/api")
+    app.include_router(watchlist_router, prefix="/api")
     app.websocket("/ws")(ws_endpoint)
     return app
 

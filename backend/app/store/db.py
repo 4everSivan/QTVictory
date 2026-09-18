@@ -70,6 +70,14 @@ class Database:
                     ("schema_version", "1"),
                 )
                 applied.append(1)
+            if current < 2:
+                self._migrate_v2()
+                self.conn.execute(
+                    "INSERT INTO _meta(key, value) VALUES(?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    ("schema_version", "2"),
+                )
+                applied.append(2)
         return applied
 
     def _migrate_v1(self) -> None:
@@ -256,6 +264,15 @@ class Database:
             "CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
             _NO_PARAMS,
         )
+
+    def _migrate_v2(self) -> None:
+        """v2：watchlist 表（02 §6.2，T23 自选股；老库升级无损）。"""
+        assert self.conn is not None
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS watchlist (
+              code TEXT PRIMARY KEY,
+              added_at TEXT NOT NULL
+            )""", _NO_PARAMS)
 
     # -- transactions ------------------------------------------------------
 

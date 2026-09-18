@@ -79,6 +79,8 @@ export const ERROR_MAP: Record<string, ErrorSpec> = {
   NOT_ACTIVE: { level: 'toast', text: () => '委托非活动状态，无法撤单' },
   UNAUTHORIZED: { level: 'toast', text: () => '缺少或错误的 X-API-Key' },
   DUPLICATE_REQUEST: { level: 'toast', text: () => '重复请求（幂等键冲突）' },
+  BAD_CODE: { level: 'toast', text: (m) => m || '代码非法或行情源不可达' },
+  QUOTE_SOURCE_ERROR: { level: 'toast', text: (m) => m || '行情源校验不可用，稍后重试' },
 }
 
 export function presentError(error: ApiError): ErrorPresentation {

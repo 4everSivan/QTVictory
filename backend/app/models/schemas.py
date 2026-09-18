@@ -57,3 +57,8 @@ class EntryCreate(BaseModel):
     triggerParams: dict[str, Any] = Field(default_factory=dict)
     action: dict[str, Any]
     tif: Literal["day", "gtc"] = "day"
+
+
+class WatchlistBatchIn(BaseModel):
+    add: list[str] = Field(default_factory=list, max_length=200)
+    remove: list[str] = Field(default_factory=list, max_length=200)

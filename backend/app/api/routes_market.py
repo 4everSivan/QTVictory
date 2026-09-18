@@ -44,3 +44,10 @@ async def market_minute(
     day = date or ctx.store.get_state("trading_date") or ""
     rows = await asyncio.to_thread(ctx.store.minutes_for, code, day)
     return {"code": code, "date": day, "data": rows}
+
+
+@router.get("/market/suggest")
+async def market_suggest(request: Request, q: str = Query(min_length=1, max_length=32)):
+    """名称联想（T23-4）：腾讯 smartbox 代理，规范化 [{code, name, kind}]，
+    服务端短缓存 + 全局限速；上游故障返回空列表。"""
+    return {"data": await request.app.state.ctx.market.suggest(q)}

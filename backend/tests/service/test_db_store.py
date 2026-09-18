@@ -16,9 +16,33 @@ def make_store(tmp_path, migrate=True) -> tuple[Database, Store]:
 
 def test_migrate_idempotent(tmp_path):
     db, _ = make_store(tmp_path, migrate=False)
-    assert db.migrate() == [1]
+    assert db.migrate() == [1, 2]
     assert db.migrate() == []  # 重复启动不重复执行
     db.close()
+
+
+def test_migrate_v2_upgrades_v1_db(tmp_path):
+    """T23-1：v1 时代老库升级无损——补建 watchlist，存量数据保留。"""
+    path = str(tmp_path / "old.db")
+    db = Database(path)
+    db.connect()
+    db._migrate_v1()
+    db.conn.execute(
+        "INSERT INTO _meta(key, value) VALUES(?, ?)", ("schema_version", "1")
+    )
+    tid = Store(db).insert_trader("老交易员", "manual", None, None,
+                                  100000.0, 100000.0, "2026-09-16T09:00")
+    db.close()
+
+    db2 = Database(path)
+    db2.connect()
+    assert db2.migrate() == [2]          # 仅补 v2，v1 不重跑
+    s2 = Store(db2)
+    assert s2.get_trader(tid)["name"] == "老交易员"  # 存量无损
+    s2.watchlist_add("sh600519", "2026-09-18T09:30:00")
+    assert s2.watchlist_codes() == ["sh600519"]
+    assert db2.migrate() == []           # 迁移幂等
+    db2.close()
 
 
 def test_wal_mode(tmp_path):

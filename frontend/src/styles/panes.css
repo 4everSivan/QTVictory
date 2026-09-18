@@ -65,6 +65,7 @@
 
 /* ---- 自选股列表（01 §4.2） ---- */
 .watchlist {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -91,6 +92,7 @@
 }
 
 .wl-row {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 76px 60px;
   align-items: center;
@@ -153,6 +155,130 @@
   padding: 6px 10px;
   border-top: 1px solid var(--line);
   font-size: 12px;
+}
+
+/* ---- 自选股编辑（01 §4.2 v5，T24） ---- */
+.wl-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wl-add {
+  background: none;
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  padding: 0 7px;
+  line-height: 16px;
+  font-size: 11px;
+  color: var(--txt2);
+  cursor: pointer;
+}
+
+.wl-add:hover {
+  color: var(--txt);
+  border-color: var(--txt3);
+}
+
+.wl-add-pop {
+  position: absolute;
+  top: 30px;
+  left: 8px;
+  right: 8px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--raised);
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.wl-add-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  padding: 5px 8px;
+  color: var(--txt);
+  font-size: 12px;
+  outline: none;
+}
+
+.wl-add-input:focus {
+  border-color: var(--txt3);
+}
+
+.wl-suggest {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.wl-suggest-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wl-suggest-item:hover,
+.wl-suggest-item.active {
+  background: var(--dim);
+}
+
+.wl-suggest-item.active {
+  box-shadow: inset 2px 0 0 var(--txt);
+}
+
+.wl-suggest-code {
+  color: var(--txt3);
+  font-size: 10px;
+}
+
+.wl-suggest-empty {
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--txt3);
+}
+
+.wl-del {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  background: var(--raised);
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  color: var(--txt3);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.wl-row:hover .wl-del,
+.wl-row:focus-within .wl-del {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.wl-del:hover {
+  color: var(--up);
+  border-color: var(--up);
 }
 
 .flash-up {

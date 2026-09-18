@@ -23,6 +23,7 @@
 ---
 
 ### 维护与修复 (Fixed)
+- **suggest 联想名称 unicode 转义未解码**：腾讯 smartbox hint 串名称字段为字面 `\uXXXX` 转义文本，`parse_suggest_payload` 原文透传导致联想下拉名称不可读。已补正则反转义还原（直编码中文路径不受影响），E2E 中文名称断言恢复。详见变更卡 [C009](docs/devel/change/C009-修复suggest联想名称unicode转义未解码.md)。
 - **按钮样式未对齐原型重置**：生产仅移植了按钮颜色重置（C006），字体/背景/边框/指针仍走 UA 默认，按钮渲染系统字体而非 Space Grotesk 三族。已补全为 v1 原型完整口径 `font: inherit; color: inherit; background: none; border: none; cursor: pointer`。详见变更卡 [C007](docs/devel/change/C007-按钮重置全量对齐原型口径.md)。
 - **交易员切换器名称黑字不可辨**：生产移植丢失 v1 原型的全局按钮重置，`button` UA 默认 `color: ButtonText`（黑）不继承正文文本色。已补回全局 `button { color: inherit }` 并重归一。详见变更卡 [C006](docs/devel/change/C006-按钮颜色继承重置缺失修复.md)。
 - **滚动条样式缺失**：生产移植丢失 v1 原型的全局细滚动条样式，逐笔成交/下单面板等溢出区域露出浏览器原生粗亮滚动条。已补回全局 8px 细条（`--line2` thumb / 透明 track / Firefox `scrollbar-width: thin`），深浅套系令牌驱动自适应。详见变更卡 [C005](docs/devel/change/C005-滚动条样式缺失修复.md)。
@@ -83,9 +84,12 @@
   - 监听真实浏览器运行时，断言主题三态切换与全链路控制台 Console 零报错（22 项几何与交互验收全过）。
 
 #### 5. 工程与开发规范文档 (Documentation)
-- **架构方案**：前端设计规范 [01-前端设计方案.md (v4.3)](docs/devel/design/01-前端设计方案.md) 与后端设计方案 [02-后端设计方案.md (v5.0)](docs/devel/design/02-后端设计方案.md)。
-- **开发计划与任务卡**：18 篇里程碑计划（`docs/devel/plan/M1–M16`）与 22 篇任务细化卡（`docs/devel/task/T01–T22`）。
-- **终验报告**：[01-M8 后端验收报告.md](docs/devel/report/01-M8-验收报告.md) 与 [02-M16 前端验收报告.md](docs/devel/report/02-M16-前端验收报告.md)。
+- **架构方案**：前端设计规范 [01-前端设计方案.md (v5.0)](docs/devel/design/01-前端设计方案.md) 与后端设计方案 [02-后端设计方案.md (v6.0)](docs/devel/design/02-后端设计方案.md)。
+- **开发计划与任务卡**：19 篇里程碑计划（`docs/devel/plan/M1–M17`）与 24 篇任务细化卡（`docs/devel/task/T01–T24`）。
+- **终验报告**：[01-M8 后端验收报告.md](docs/devel/report/01-M8-验收报告.md)、[02-M16 前端验收报告.md](docs/devel/report/02-M16-前端验收报告.md) 与 [03-M17 自选股编辑验收报告.md](docs/devel/report/03-M17-自选股编辑验收报告.md)。
 - **环境治理**：[01-环境缓存与依赖清理指南.md](docs/devel/env/01-环境缓存与依赖清理指南.md)，规范磁盘缓存与依赖清理路径。
 - **待办缓冲池**：`docs/devel/todo/` 未入轨缺陷与需求登记（按版本分文件、落地即移出零沉淀、BG/EN/FT/TD 编号契约）。
 - **治理规则**：变更核收 AI 汇报 + 会话确认代签；design 章节、变更卡与 CHANGELOG 双向互链；测试环境《部署验收单》（`local/deployment-report.md`，现实绑定维护命令与 Cmd+点击前端入口）。
+
+#### 6. 维护期增补 (Post-Phase-1 Enhancements)
+- **自选股编辑**（里程碑 [M17](docs/devel/plan/M17-自选股编辑.md)，验收 [R-M17](docs/devel/report/03-M17-自选股编辑验收报告.md)，来源 FT-0001）：观察员级全局自选集增删标的（品种不限），行情关注集扩为 自选 ∪ 持仓 ∪ 计划池 ∪ 指数；新增端点 `GET /api/watchlist`、`PUT/DELETE /api/watchlist/{code}`（单码幂等、裸码按板块规则归一前缀码落库）、`POST /api/watchlist/batch`（逐码校验、部分应用、逐码回执 `{code, op, ok, error}`）、`GET /api/market/suggest`（腾讯 smartbox 联想代理，GBK 解码 + 30s 缓存）；添加即异步引导日K 历史（腾讯 ifzq → 东财 push2his 兜底，批量串行排队）；前端自选股列表 "+" 弹层联想添加、hover 删除（动态项不可删）、自选置顶按添加时间倒序。
