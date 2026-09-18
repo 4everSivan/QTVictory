@@ -21,12 +21,21 @@ const templates = {
   ],
 }
 
+const detail = {
+  traderId: 1,
+  name: 'Alpha',
+  mode: 'strategy',
+  status: 'running',
+  strategyParams: null as Record<string, number> | null,
+}
+
 function stubFetch() {
   return vi.stubGlobal(
     'fetch',
-    vi.fn(() =>
-      Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(templates) } as Response),
-    ),
+    vi.fn((url: string) => {
+      const body = url.includes('/templates') ? templates : detail
+      return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify(body) } as Response)
+    }),
   )
 }
 
@@ -83,8 +92,9 @@ describe('创建/编辑对话框（01 §4.10〔v2 新增〕）', () => {
     })
   })
 
-  it('编辑态回显名称与策略参数（模板默认值基底）', async () => {
+  it('编辑态回显名称与策略参数（strategyParams 为 null 时回落模板默认值）', async () => {
     stubFetch()
+    detail.strategyParams = null
     state.editTarget = {
       id: 1,
       name: 'Alpha',
@@ -99,5 +109,24 @@ describe('创建/编辑对话框（01 §4.10〔v2 新增〕）', () => {
     expect(screen.getByDisplayValue('Alpha')).toBeInTheDocument()
     await screen.findByText('fast')
     expect(screen.getByDisplayValue('5')).toBeInTheDocument()
+  })
+
+  it('编辑态回填当前生效 strategyParams（C003，非模板默认值）', async () => {
+    stubFetch()
+    detail.strategyParams = { fast: 9, slow: 99, pctOfCash: 0.2 }
+    state.editTarget = {
+      id: 1,
+      name: 'Alpha',
+      mode: 'strategy',
+      strategyType: 'trend',
+      status: 'running',
+      initCash: 1e6,
+      equity: 1.05e6,
+      totalReturn: 0.05,
+    }
+    render(<TraderFormDialog mode="edit" onClose={() => {}} />)
+    await screen.findByText('fast')
+    expect(screen.getByDisplayValue('9')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('99')).toBeInTheDocument()
   })
 })

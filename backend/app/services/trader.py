@@ -260,4 +260,10 @@ class TraderService:
         account["plans"] = [
             self.ctx.plans.plan_view(p) for p in store.plans_for_trader(trader_id)
         ]
+        # C003：编辑态回填——详情响应增补当前生效 strategyParams（manual 为 null）
+        import json as _json
+        trader = store.get_trader(trader_id)
+        account["strategyParams"] = (
+            _json.loads(trader["strategy_params"]) if trader and trader["strategy_params"] else None
+        )
         return account

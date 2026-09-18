@@ -4,7 +4,7 @@ import { useTraders, traderOps } from '../../state/traders'
 import { toast } from '../panes/Toasts'
 import { ApiError } from '../../api/client'
 import { presentError } from '../../api/errors'
-import type { Template } from '../../api/types'
+import type { Template, TraderDetail } from '../../api/types'
 
 interface TraderFormDialogProps {
   mode: 'create' | 'edit'
@@ -20,6 +20,10 @@ export function TraderFormDialog({ mode, onClose }: TraderFormDialogProps) {
   const { editTarget, refresh } = useTraders()
   const templatesQuery = useQuery<{ data: Template[] }>('/templates')
   const templates = templatesQuery.data?.data ?? []
+  // C003：编辑态拉取详情，回填当前生效 strategyParams
+  const detailQuery = useQuery<TraderDetail>(
+    mode === 'edit' && editTarget ? `/traders/${editTarget.id}` : null,
+  )
 
   const [name, setName] = useState(mode === 'edit' ? (editTarget?.name ?? '') : '')
   const [traderMode, setTraderMode] = useState<'manual' | 'strategy'>(editTarget?.mode ?? 'manual')
@@ -39,16 +43,24 @@ export function TraderFormDialog({ mode, onClose }: TraderFormDialogProps) {
   )
 
   useEffect(() => {
-    // 编辑态参数基底 = 所属模板默认值（后端未暴露单交易员 strategyParams 读取端点，登记后续迭代）
-    if (mode === 'edit' && editTarget?.mode === 'strategy' && editTarget.strategyType) {
-      const tpl = templates.find((t) => t.template === editTarget.strategyType)
-      if (tpl) {
-        const defaults: Record<string, number> = {}
-        for (const [k, v] of Object.entries(tpl.params)) defaults[k] = v.default
-        setParams(defaults)
+    // 编辑态参数基底 = 当前生效 strategyParams（C003，GET /traders/{id} 回填）；
+    // 后端值为 null（历史数据/manual）时回落所属模板默认值
+    if (mode === 'edit' && editTarget?.mode === 'strategy') {
+      const current = detailQuery.data?.strategyParams
+      if (current) {
+        setParams(current)
+        return
+      }
+      if (editTarget.strategyType) {
+        const tpl = templates.find((t) => t.template === editTarget.strategyType)
+        if (tpl) {
+          const defaults: Record<string, number> = {}
+          for (const [k, v] of Object.entries(tpl.params)) defaults[k] = v.default
+          setParams(defaults)
+        }
       }
     }
-  }, [mode, editTarget, templates])
+  }, [mode, editTarget, templates, detailQuery.data])
 
   useEffect(() => {
     if (mode !== 'create') return

@@ -102,3 +102,27 @@ async def test_account_view_positions():
         assert "created" in actions and "order" in actions and "fill" in actions
     finally:
         await ctx.stop()
+
+
+async def test_detail_view_strategy_params():
+    """C003：详情响应增补当前生效 strategyParams（编辑态回填依据）。"""
+    _, ctx = make_app()
+    await ctx.start()
+    try:
+        t = await ctx.traders.create({
+            "name": "动量", "mode": "strategy", "template": "momentum", "initCash": 100000,
+            "params": {"lookback": 25, "threshold": 0.04},
+        })
+        tid = t["id"]
+        detail = ctx.traders.detail_view(tid)
+        assert detail["strategyParams"]["lookback"] == 25  # 自定义值生效
+        assert detail["strategyParams"]["threshold"] == 0.04
+        assert "buffer" in detail["strategyParams"]  # 模板默认键保留（合并口径）
+        # PATCH 更新后详情回读新值
+        await ctx.traders.patch(tid, {"strategy_params": {"lookback": 30, "threshold": 0.05}})
+        assert ctx.traders.detail_view(tid)["strategyParams"]["lookback"] == 30
+        # manual 交易员为 null
+        m = await ctx.traders.create({"name": "手动", "mode": "manual", "initCash": 100000})
+        assert ctx.traders.detail_view(m["id"])["strategyParams"] is None
+    finally:
+        await ctx.stop()

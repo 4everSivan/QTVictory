@@ -35,6 +35,7 @@ const detail: TraderDetail = {
     { trader_id: 1, date: '2026-09-12', total_equity: 1_060_000, cash: 800_000 },
   ],
   plans: [],
+  strategyParams: null,
 }
 
 describe('收益分析 Tab（01 §4.9）', () => {

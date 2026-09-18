@@ -144,6 +144,8 @@ export interface TraderDetail extends AccountView {
   trades: TradeRow[]
   equitySeries: EquityPoint[]
   plans: PlanView[]
+  /** C003：当前生效策略参数（编辑态回填依据；manual 为 null） */
+  strategyParams: Record<string, number> | null
 }
 
 /* ---- 订单 / 成交 / 持仓 / 净值（snake_case DB 行，page_result 包壳） ---- */
