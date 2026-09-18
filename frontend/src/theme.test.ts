@@ -1,48 +1,72 @@
-import { describe, expect, it, beforeEach } from 'vitest'
-import { lsClear, lsGet, lsSet } from './lib/storage'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  applyTheme,
+  applyMode,
   CHART_THEMES,
-  getTheme,
+  cycleMode,
+  getMode,
   initTheme,
-  THEMES,
-  toggleTheme,
+  onThemeChange,
+  resolveTheme,
 } from './theme'
+import { lsClear } from './lib/storage'
 
-describe('theme 模块（01 §3.1/§3.3 双主题）', () => {
-  beforeEach(() => {
-    lsClear()
-    document.documentElement.removeAttribute('data-theme')
+beforeEach(() => {
+  lsClear()
+  delete document.documentElement.dataset.theme
+  vi.unstubAllGlobals()
+})
+
+describe('theme 模块（01 §3.1 三态切换，C002）', () => {
+  it('默认模式为深色（Nothing 纯黑基线），initTheme 写入 data-theme 与 window.__THEME', () => {
+    expect(getMode()).toBe('dark')
+    initTheme()
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(window.__THEME).toBe(CHART_THEMES.dark)
+    expect(CHART_THEMES.dark.up).toBe('#d71921')
+    expect(CHART_THEMES.dark.txt).toBe('#e8e8e8')
   })
 
-  it('默认主题为 nothing 基线', () => {
-    expect(getTheme()).toBe('nothing')
+  it('cycleMode 按 浅色→深色→跟随系统 循环并持久化模式', () => {
+    applyMode('light')
+    expect(cycleMode()).toBe('dark')
+    expect(cycleMode()).toBe('system')
+    expect(cycleMode()).toBe('light')
+    expect(getMode()).toBe('light')
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(window.__THEME).toBe(CHART_THEMES.light)
   })
 
-  it('非法持久化值回落默认主题', () => {
-    lsSet('qtv_theme', 'bogus')
-    expect(getTheme()).toBe('nothing')
+  it('浅色套系语义色色相不变、按浅色背景调校（涨色同值，跌/警示加深保对比）', () => {
+    expect(CHART_THEMES.light.up).toBe(CHART_THEMES.dark.up)
+    expect(CHART_THEMES.light.down).toBe('#2e7d42')
+    expect(CHART_THEMES.light.txt).toBe('#1a1a1a')
   })
 
-  it('applyTheme 同步 data-theme、window.__THEME 与持久化', () => {
-    applyTheme('terminal')
-    expect(document.documentElement.dataset.theme).toBe('terminal')
-    expect(window.__THEME).toBe(CHART_THEMES.terminal)
-    expect(lsGet('qtv_theme')).toBe('terminal')
+  it('system 模式经 prefers-color-scheme 解析（无 matchMedia 环境回退深色）', () => {
+    expect(resolveTheme('system')).toBe('dark')
+    const listener: { current: (() => void) | null } = { current: null }
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: (_: string, cb: () => void) => {
+        listener.current = cb
+      },
+    }))
+    expect(resolveTheme('system')).toBe('light')
+    initTheme()
+    applyMode('system')
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(window.__THEME).toBe(CHART_THEMES.light)
+    expect(typeof listener.current).toBe('function')
   })
 
-  it('toggleTheme 在两套皮肤间往返', () => {
-    expect(toggleTheme()).toBe('terminal')
-    expect(toggleTheme()).toBe('nothing')
-  })
-
-  it('initTheme 恢复持久化主题并写入 __THEME', () => {
-    lsSet('qtv_theme', 'terminal')
-    expect(initTheme()).toBe('terminal')
-    expect(window.__THEME).toBe(CHART_THEMES.terminal)
-  })
-
-  it('主题集合与设计定稿一致（基线 + 备选）', () => {
-    expect(THEMES).toEqual(['nothing', 'terminal'])
+  it('主题切换通知订阅者（图表主题实时刷新入口）', () => {
+    const seen: string[] = []
+    const off = onThemeChange((t) => seen.push(t))
+    applyMode('light')
+    applyMode('dark')
+    off()
+    applyMode('light')
+    expect(seen).toEqual(['light', 'dark'])
   })
 })

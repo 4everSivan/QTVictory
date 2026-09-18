@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * T22 浏览器实测 + 几何校验（01 §11 v1 验证方法）：
- * 对 preview 构建 + 真实后端执行——加载零报错、双主题切换、一屏五区几何、降级断点。
+ * 对 preview 构建 + 真实后端执行——加载零报错、一屏五区几何、主题三态切换（C002：浅色/深色/跟随系统）、降级断点。
  * 运行：node scripts/e2e.mjs（需后端 8787 已启动且 dist 已构建；preview 端口 4312）
  */
 import { chromium } from 'playwright'
@@ -104,21 +104,32 @@ check(
   `got ${main.geo.watchPct?.toFixed(1)}%`,
 )
 
-console.log('--- 交互：主题切换 / Dock Tab / 双主题零报错 ---')
-const themeBefore = await main.page.getAttribute('html', 'data-theme')
-await main.page.click('.theme-toggle')
-await main.page.waitForTimeout(300)
-const themeAfter = await main.page.getAttribute('html', 'data-theme')
-check('主题切换 data-theme 变更', themeBefore !== themeAfter, `${themeBefore} -> ${themeAfter}`)
+console.log('--- 交互：Dock Tab / 主题三态切换（C002：浅色→深色→跟随系统） ---')
 await main.page.click('[data-testid="dock"] >> role=tab[name="当日委托"]')
 await main.page.waitForTimeout(400)
 const ordersTab = await main.page.$('[data-testid="dock-orders"]')
 check('Dock 委托 Tab 可切换', Boolean(ordersTab))
-await main.page.click('.theme-toggle') // 切回基线再断言报错集合
-await main.page.waitForTimeout(300)
+
+const themeBtn = await main.page.$('.theme-toggle')
+check('顶栏主题切换按钮存在（默认深色）', Boolean(themeBtn) && (await main.page.$eval('.theme-toggle', (el) => el.textContent)) === '深色')
+await main.page.click('.theme-toggle')
+await main.page.waitForTimeout(200)
+const mode1 = await main.page.$eval('.theme-toggle', (el) => el.textContent)
+const dt1 = await main.page.$eval('html', (el) => el.dataset.theme)
+check('切换 1 次 → 跟随系统（已解析为 light/dark）', mode1 === '跟随系统' && (dt1 === 'light' || dt1 === 'dark'), `got ${mode1}/${dt1}`)
+await main.page.click('.theme-toggle')
+await main.page.waitForTimeout(200)
+const mode2 = await main.page.$eval('.theme-toggle', (el) => el.textContent)
+const dt2 = await main.page.$eval('html', (el) => el.dataset.theme)
+check('切换 2 次 → 浅色（data-theme=light）', mode2 === '浅色' && dt2 === 'light', `got ${mode2}/${dt2}`)
+await main.page.click('.theme-toggle')
+await main.page.waitForTimeout(200)
+const mode3 = await main.page.$eval('.theme-toggle', (el) => el.textContent)
+const dt3 = await main.page.$eval('html', (el) => el.dataset.theme)
+check('切换 3 次 → 深色（data-theme=dark）', mode3 === '深色' && dt3 === 'dark', `got ${mode3}/${dt3}`)
 
 const errText = main.consoleErrors.filter((e) => !e.includes('fonts.g') && !e.includes('WebSocket connection'))
-check('双主题主视口 console 零报错', errText.length === 0, JSON.stringify(errText.slice(0, 4)))
+check('主视口 console 零报错', errText.length === 0, JSON.stringify(errText.slice(0, 4)))
 
 // ---- ≤1180px 降级断点 ----
 const small = await auditViewport(1100, 800)

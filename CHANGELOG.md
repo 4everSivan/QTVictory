@@ -15,6 +15,7 @@
 ---
 
 ### 变更 (Changed)
+- **浅色主题接入与三态主题切换**：新增浅色明晰风套系（语义色色相不变、按浅色背景调校明度保对比），顶栏主题按钮按 浅色→深色→跟随系统 循环，模式持久化 `localStorage qtv_theme`，跟随系统经 `prefers-color-scheme` 实时解析；终端深蓝套系维持废弃。详见变更卡 [C002](docs/devel/change/C002-浅色主题细节接入.md)。
 - **主题收敛为单一 Nothing 深色套系**：移除终端深蓝备选皮肤、顶栏主题切换按钮与主题持久化机制，全站唯一主题。详见变更卡 [C004](docs/devel/change/C004-主题收敛为单一Nothing深色套系.md)。（其移除的切换机制已由 C002 以三态形态重建。）
 - **`GET /api/traders/{id}` 详情响应增补 `strategyParams`**：返回当前生效策略参数（manual 为 null），前端交易员编辑弹窗以此回填，消除模板默认值静默覆盖自定义参数的风险。详见变更卡 [C003](docs/devel/change/C003-交易员编辑态strategyParams读取端点.md)。
 
@@ -57,7 +58,7 @@
 #### 3. 前端 Web 控制台 (Frontend Web Console)
 - **Nothing 设计系统** (`frontend/src/styles/`):
   - 采用 Nothing 极简工业美学，以单色灰阶构筑信息层级，仅将红色用于数据语义。
-  - 支持 Nothing Dark 与 Standard Light 双主题即时无缝切换。
+  - 三态主题规范（浅色/深色/跟随系统，C002；深色为 Nothing 纯黑默认基线，终端深蓝套系 C004 起废弃）。
   - 全屏数据数值统一强制 `tabular-nums`，执行 15px（数据）/ 14px（品牌）/ 12px（交互）/ 9px（微标签）四档字号纪律。
 - **一屏式高密度监控工作台** (`frontend/src/components/panes/`):
   - **顶栏**：系统状态胶囊、交易员下拉切换器、均分五指标数据带（等分拉宽）、沪深300 指数及系统时钟。
@@ -75,7 +76,7 @@
 - **前端测试套件**：133 个 Vitest / jsdom 单元与组件测试用例全部通过。
 - **无头浏览器端到端验收** (`frontend/scripts/e2e.mjs`)：
   - 基于 Playwright + Chromium 自动化验证 1560×940 主视口各区域物理像素尺寸（误差 ≤ 1px）与 ≤1180px 响应式降级断点。
-  - 监听真实浏览器运行时，断言双主题切换全链路控制台 Console 零报错。
+  - 监听真实浏览器运行时，断言主题三态切换与全链路控制台 Console 零报错（22 项几何与交互验收全过）。
 
 #### 5. 工程与开发规范文档 (Documentation)
 - **架构方案**：前端设计规范 [01-前端设计方案.md (v2.1)](docs/devel/design/01-前端设计方案.md) 与后端设计方案 [02-后端设计方案.md (v3)](docs/devel/design/02-后端设计方案.md)。

@@ -1,8 +1,12 @@
-export type ThemeName = 'nothing' | 'terminal'
+import { lsGet, lsSet } from './lib/storage'
 
-export const THEMES: readonly ThemeName[] = ['nothing', 'terminal']
+/** 主题模式（01 §3.1，C002）：浅色 / 深色 / 跟随系统，三态循环 */
+export type ThemeMode = 'light' | 'dark' | 'system'
+/** 已解析主题：system 经 prefers-color-scheme 解析为 light/dark 之一 */
+export type ResolvedTheme = 'light' | 'dark'
 
-export const DEFAULT_THEME: ThemeName = 'nothing'
+export const THEME_MODES: readonly ThemeMode[] = ['light', 'dark', 'system']
+export const DEFAULT_MODE: ThemeMode = 'dark'
 
 export interface ChartTheme {
   up: string
@@ -19,8 +23,8 @@ export interface ChartTheme {
   areaDown: string
 }
 
-export const CHART_THEMES: Record<ThemeName, ChartTheme> = {
-  nothing: {
+export const CHART_THEMES: Record<ResolvedTheme, ChartTheme> = {
+  dark: {
     up: '#d71921',
     down: '#4a9e5c',
     flat: '#999999',
@@ -34,23 +38,21 @@ export const CHART_THEMES: Record<ThemeName, ChartTheme> = {
     areaUp: 'rgba(215, 25, 33, 0.05)',
     areaDown: 'rgba(74, 158, 92, 0.05)',
   },
-  terminal: {
-    up: '#f04752',
-    down: '#2ebd85',
-    flat: '#8b98a9',
-    line: '#222a38',
-    line2: '#3a4a63',
-    txt: '#e6edf3',
-    txt2: '#8b98a9',
-    txt3: '#5c6b7f',
-    grid: '#222a38',
-    crosshair: '#3a4a63',
-    areaUp: 'rgba(240, 71, 82, 0.05)',
-    areaDown: 'rgba(46, 189, 133, 0.05)',
+  light: {
+    up: '#d71921',
+    down: '#2e7d42',
+    flat: '#777777',
+    line: '#e5e5e5',
+    line2: '#cccccc',
+    txt: '#1a1a1a',
+    txt2: '#666666',
+    txt3: '#999999',
+    grid: '#ececec',
+    crosshair: '#cccccc',
+    areaUp: 'rgba(215, 25, 33, 0.08)',
+    areaDown: 'rgba(46, 125, 66, 0.08)',
   },
 }
-
-import { lsGet, lsSet } from './lib/storage'
 
 const STORAGE_KEY = 'qtv_theme'
 
@@ -60,24 +62,27 @@ declare global {
   }
 }
 
-function isThemeName(value: string | null): value is ThemeName {
-  return value === 'nothing' || value === 'terminal'
+function isThemeMode(value: string | null): value is ThemeMode {
+  return value === 'light' || value === 'dark' || value === 'system'
 }
 
-export function getTheme(): ThemeName {
+function systemTheme(): ResolvedTheme {
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  }
+  return 'dark'
+}
+
+export function resolveTheme(mode: ThemeMode): ResolvedTheme {
+  return mode === 'system' ? systemTheme() : mode
+}
+
+export function getMode(): ThemeMode {
   const stored = lsGet(STORAGE_KEY)
-  return isThemeName(stored) ? stored : DEFAULT_THEME
+  return isThemeMode(stored) ? stored : DEFAULT_MODE
 }
 
-export function applyTheme(theme: ThemeName): ThemeName {
-  document.documentElement.dataset.theme = theme
-  window.__THEME = CHART_THEMES[theme]
-  lsSet(STORAGE_KEY, theme)
-  for (const listener of themeListeners) listener(theme)
-  return theme
-}
-
-type ThemeListener = (theme: ThemeName) => void
+type ThemeListener = (theme: ResolvedTheme) => void
 const themeListeners = new Set<ThemeListener>()
 
 export function onThemeChange(listener: ThemeListener): () => void {
@@ -87,11 +92,26 @@ export function onThemeChange(listener: ThemeListener): () => void {
   }
 }
 
-export function toggleTheme(): ThemeName {
-  const next: ThemeName = getTheme() === 'nothing' ? 'terminal' : 'nothing'
-  return applyTheme(next)
+export function applyMode(mode: ThemeMode): ThemeMode {
+  const resolved = resolveTheme(mode)
+  document.documentElement.dataset.theme = resolved
+  window.__THEME = CHART_THEMES[resolved]
+  lsSet(STORAGE_KEY, mode)
+  for (const listener of themeListeners) listener(resolved)
+  return mode
 }
 
-export function initTheme(): ThemeName {
-  return applyTheme(getTheme())
+export function cycleMode(): ThemeMode {
+  const current = getMode()
+  const next = THEME_MODES[(THEME_MODES.indexOf(current) + 1) % THEME_MODES.length]
+  return applyMode(next)
+}
+
+export function initTheme(): ThemeMode {
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (getMode() === 'system') applyMode('system')
+    })
+  }
+  return applyMode(getMode())
 }

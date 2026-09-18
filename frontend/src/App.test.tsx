@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -51,7 +51,7 @@ afterEach(() => {
 })
 
 describe('App 栅格外壳（01 §2.2 一屏五区）', () => {
-  it('渲染行情/盘口/个股头/图表区与未完成占位区，主题按钮存在', async () => {
+  it('渲染行情/盘口/个股头/图表区与未完成占位区', async () => {
     render(<App />)
     expect(screen.getByTestId('watchlist')).toBeInTheDocument()
     expect(screen.getByTestId('quote-header')).toBeInTheDocument()
@@ -71,8 +71,16 @@ describe('App 栅格外壳（01 §2.2 一屏五区）', () => {
     expect(container.querySelector('.dock')).toBeTruthy()
   })
 
-  it('主题切换按钮存在（NOTHING/TERMINAL）', () => {
+  it('顶栏主题三态切换按钮（C002：浅色→深色→跟随系统 循环）', () => {
     render(<App />)
-    expect(screen.getByRole('button', { name: /NOTHING|TERMINAL/ })).toBeInTheDocument()
+    const btn = screen.getByRole('button', { name: '深色' })
+    fireEvent.click(btn)
+    expect(btn).toHaveTextContent('跟随系统')
+    fireEvent.click(btn)
+    expect(btn).toHaveTextContent('浅色')
+    expect(document.documentElement.dataset.theme).toBe('light')
+    fireEvent.click(btn)
+    expect(btn).toHaveTextContent('深色')
+    expect(document.documentElement.dataset.theme).toBe('dark')
   })
 })

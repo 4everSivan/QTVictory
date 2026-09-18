@@ -24,7 +24,13 @@ import {
   useMarketSelection,
 } from './state/marketData'
 import { isIndexCode } from './lib/format'
-import { getTheme, toggleTheme, type ThemeName } from './theme'
+import { cycleMode, getMode, type ThemeMode } from './theme'
+
+const MODE_LABEL: Record<ThemeMode, string> = {
+  light: '浅色',
+  dark: '深色',
+  system: '跟随系统',
+}
 
 type QuotesFrame = Extract<ServerFrame, { topic: 'quotes' }>
 
@@ -34,7 +40,7 @@ function pickDefault(quotes: Quote[]): string | null {
 }
 
 function Shell() {
-  const [theme, setTheme] = useState<ThemeName>(() => getTheme())
+  const [mode, setMode] = useState<ThemeMode>(() => getMode())
   const [selected, setSelected] = useState<string | null>(null)
   const { dialog, editTarget, closeDialog, detailOpen, closeDetail, detail } = useTraders()
   const toasts = useToasts()
@@ -71,9 +77,9 @@ function Shell() {
         <button
           type="button"
           className="num theme-toggle"
-          onClick={() => setTheme(toggleTheme())}
+          onClick={() => setMode(cycleMode())}
         >
-          {theme === 'nothing' ? 'NOTHING' : 'TERMINAL'}
+          {MODE_LABEL[mode]}
         </button>
       </header>
       <aside className="leftcol">

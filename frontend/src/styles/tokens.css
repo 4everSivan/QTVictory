@@ -1,5 +1,6 @@
-/* 01 §3.2 Nothing 基线令牌（深色主皮肤） */
-:root[data-theme='nothing'] {
+/* 01 §3.1/§3.2 Nothing 深色基线令牌（默认套系；C002 三态切换，未解析前默认深色） */
+:root,
+:root[data-theme='dark'] {
   --bg: #000000;
   --surface: #0d0d0d;
   --raised: #141414;
@@ -18,3 +19,22 @@
   --font-price: 'Doto', 'Space Mono', monospace;
 }
 
+/* 01 §3.2 浅色明晰风令牌（C002）：语义色色相不变，按浅色背景重调明度/饱和度保对比 */
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --surface: #f7f7f7;
+  --raised: #efefef;
+  --line: #e5e5e5;
+  --line2: #cccccc;
+  --txt: #1a1a1a;
+  --txt2: #666666;
+  --txt3: #999999;
+  --up: #d71921;
+  --down: #2e7d42;
+  --warn: #96700e;
+  --acc: #d71921;
+  --dim: rgba(0, 0, 0, 0.08);
+  --font-body: 'Space Grotesk', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-num: 'Space Mono', 'PingFang SC', monospace;
+  --font-price: 'Doto', 'Space Mono', monospace;
+}

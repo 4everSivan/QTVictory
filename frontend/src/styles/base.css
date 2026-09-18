@@ -120,7 +120,7 @@ body {
   border-top: 1px solid var(--line);
 }
 
-/* 主题切换按钮（顶栏，T19 并入完整顶栏） */
+/* 主题三态切换按钮（顶栏操作区，C002：浅色→深色→跟随系统） */
 .theme-toggle {
   margin-left: 12px;
   background: none;
