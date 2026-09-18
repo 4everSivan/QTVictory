@@ -22,6 +22,7 @@
 ---
 
 ### 维护与修复 (Fixed)
+- **按钮样式未对齐原型重置**：生产仅移植了按钮颜色重置（C006），字体/背景/边框/指针仍走 UA 默认，按钮渲染系统字体而非 Space Grotesk 三族。已补全为 v1 原型完整口径 `font: inherit; color: inherit; background: none; border: none; cursor: pointer`。详见变更卡 [C007](docs/devel/change/C007-按钮重置全量对齐原型口径.md)。
 - **交易员切换器名称黑字不可辨**：生产移植丢失 v1 原型的全局按钮重置，`button` UA 默认 `color: ButtonText`（黑）不继承正文文本色。已补回全局 `button { color: inherit }` 并重归一。详见变更卡 [C006](docs/devel/change/C006-按钮颜色继承重置缺失修复.md)。
 - **滚动条样式缺失**：生产移植丢失 v1 原型的全局细滚动条样式，逐笔成交/下单面板等溢出区域露出浏览器原生粗亮滚动条。已补回全局 8px 细条（`--line2` thumb / 透明 track / Firefox `scrollbar-width: thin`），深浅套系令牌驱动自适应。详见变更卡 [C005](docs/devel/change/C005-滚动条样式缺失修复.md)。
 - **日K 引导入库元组缺 code 导致 klines 表永空**：`TencentAdapter.fetch_daily_klines` 返回 6 元组与 `DataStore.upsert_klines` 的 7 元组契约不匹配，启动引导静默失败，前端"日K"页签永远空白。已对齐为 7 元组契约并补适配器→store 契约回归测试。详见变更卡 [C001](docs/devel/change/C001-修复日K引导入库元组缺code.md)。
@@ -81,7 +82,7 @@
   - 监听真实浏览器运行时，断言主题三态切换与全链路控制台 Console 零报错（22 项几何与交互验收全过）。
 
 #### 5. 工程与开发规范文档 (Documentation)
-- **架构方案**：前端设计规范 [01-前端设计方案.md (v2.1)](docs/devel/design/01-前端设计方案.md) 与后端设计方案 [02-后端设计方案.md (v3)](docs/devel/design/02-后端设计方案.md)。
+- **架构方案**：前端设计规范 [01-前端设计方案.md (v4.3)](docs/devel/design/01-前端设计方案.md) 与后端设计方案 [02-后端设计方案.md (v4.0)](docs/devel/design/02-后端设计方案.md)。
 - **开发计划与任务卡**：18 篇里程碑计划（`docs/devel/plan/M1–M16`）与 22 篇任务细化卡（`docs/devel/task/T01–T22`）。
 - **终验报告**：[01-M8 后端验收报告.md](docs/devel/report/01-M8-验收报告.md) 与 [02-M16 前端验收报告.md](docs/devel/report/02-M16-前端验收报告.md)。
 - **环境治理**：[01-环境缓存与依赖清理指南.md](docs/devel/env/01-环境缓存与依赖清理指南.md)，规范磁盘缓存与依赖清理路径。

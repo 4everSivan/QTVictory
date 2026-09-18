@@ -46,7 +46,7 @@ docs/devel/
 
 | 目录 | 索引文档 | 核心职责 | 现行状态 |
 |---|---|---|---|
-| **design/** | [design/README.md](design/README.md) | 包含 [01-前端设计方案](design/01-前端设计方案.md) (v2.1) 与 [02-后端设计方案](design/02-后端设计方案.md) (v3.0)，为系统现行真理 | 现行基线 |
+| **design/** | [design/README.md](design/README.md) | 包含 [01-前端设计方案](design/01-前端设计方案.md) (v4.3) 与 [02-后端设计方案](design/02-后端设计方案.md) (v4.0)，为系统现行真理 | 现行基线 |
 | **change/** | [change/README.md](change/README.md) | 承载 Bug 修复与回调的核验流，提供 [template.md](change/template.md) 变更卡模板与前后对比 Checklist | 持续演进 |
 | **plan/** | [plan/README.md](plan/README.md) | 包含 [00-总体开发计划](plan/00-总体开发计划.md)、[00-前端开发计划](plan/00-前端开发计划.md) 与 M1–M16 里程碑 | Phase 1 收口 |
 | **task/** | [task/README.md](task/README.md) | 包含 T01–T14（后端）与 T15–T22（前端）共 22 篇任务细化规格卡 | 全量完成 |
