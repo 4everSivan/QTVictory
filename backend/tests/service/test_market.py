@@ -54,6 +54,19 @@ class TestParse:
         [q] = parse_quote_payload(f'v_sh600519="{"~".join(f)}";')
         assert q.last == 0.0  # 停牌
 
+    def test_compact_timestamp_normalized(self):
+        """C010：真实字段 30 为 YYYYMMDDHHMMSS（实测 20260918150018），
+        归一为 HH:MM:SS；带冒号旧口径原样通过。"""
+        f = [str(i) for i in range(40)]
+        f[1] = "贵州茅台"; f[2] = "600519"; f[3] = "1688.00"; f[4] = "1680.00"
+        f[5] = "1685.00"; f[6] = "12345"
+        f[30] = "20260918093105"
+        [q] = parse_quote_payload(f'v_sh600519="{"~".join(f)}";')
+        assert q.ts == "09:31:05"
+        f[30] = "09:30:03"
+        [q] = parse_quote_payload(f'v_sh600519="{"~".join(f)}";')
+        assert q.ts == "09:30:03"
+
 
 def _sina_line(code: str = "sh600519", *, zero_book: bool = False) -> str:
     """构造一条合法的新浪快照响应（字段位与真实接口一致，量纲：股）。"""
@@ -295,6 +308,19 @@ class TestMarketRuntime:
             assert n >= 1
             rows = ctx.store.minutes_for("600519", "2026-09-16")
             assert any(r["minute"] == "09:31" for r in rows)
+        finally:
+            await ctx.stop()
+
+    async def test_minute_buckets_split_and_unparseable_skipped(self):
+        """C010：跨分钟分桶正确；不可解析 ts（降级档空串）不落桶。"""
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            await inject(ctx, quote(ts="09:30:05"))
+            await inject(ctx, quote(cum=1_100_000, ts="09:31:05"))
+            await inject(ctx, quote(cum=1_200_000, ts=""))
+            bars = ctx.market._minute_bars
+            assert sorted(m for _, m in bars) == ["09:30", "09:31"]
         finally:
             await ctx.stop()
 

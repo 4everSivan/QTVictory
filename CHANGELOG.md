@@ -23,6 +23,7 @@
 ---
 
 ### 维护与修复 (Fixed)
+- **腾讯源时间戳致分钟线单桶失真**：快照字段 30 实为 `YYYYMMDDHHMMSS`（无冒号），分钟累积的无冒号兜底把当日全部 tick 挤进 "09:31" 单桶，收盘落库后当日分时仅一根。已在适配器层统一归一为 `HH:MM:SS`，不可解析时间戳（如降级源空 ts）不再落桶。详见变更卡 [C010](docs/devel/change/C010-修复腾讯源时间戳致分钟线单桶失真.md)。
 - **suggest 联想名称 unicode 转义未解码**：腾讯 smartbox hint 串名称字段为字面 `\uXXXX` 转义文本，`parse_suggest_payload` 原文透传导致联想下拉名称不可读。已补正则反转义还原（直编码中文路径不受影响），E2E 中文名称断言恢复。详见变更卡 [C009](docs/devel/change/C009-修复suggest联想名称unicode转义未解码.md)。
 - **按钮样式未对齐原型重置**：生产仅移植了按钮颜色重置（C006），字体/背景/边框/指针仍走 UA 默认，按钮渲染系统字体而非 Space Grotesk 三族。已补全为 v1 原型完整口径 `font: inherit; color: inherit; background: none; border: none; cursor: pointer`。详见变更卡 [C007](docs/devel/change/C007-按钮重置全量对齐原型口径.md)。
 - **交易员切换器名称黑字不可辨**：生产移植丢失 v1 原型的全局按钮重置，`button` UA 默认 `color: ButtonText`（黑）不继承正文文本色。已补回全局 `button { color: inherit }` 并重归一。详见变更卡 [C006](docs/devel/change/C006-按钮颜色继承重置缺失修复.md)。

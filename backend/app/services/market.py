@@ -208,7 +208,11 @@ class MarketService:
             self._minute_date = today
         if q.last <= 0:
             return
-        minute = q.ts[:5] if ":" in q.ts else "09:31"
+        # C010：时间戳不可解析（如降级源空 ts）不落桶——原 09:31 兜底把
+        # 无冒号时间戳全部挤进单桶，当日分钟线失真
+        minute = q.ts[:5] if ":" in q.ts else ""
+        if not minute:
+            return
         key = (q.code, minute)
         price, _ = self._minute_bars.get(key, (q.last, 0))
         self._minute_bars[key] = (price, q.cum_volume)

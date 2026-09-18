@@ -29,6 +29,16 @@ _UESC = re.compile(r"\\u([0-9a-fA-F]{4})")
 def _unescape_name(s: str) -> str:
     return _UESC.sub(lambda m: chr(int(m.group(1), 16)), s)
 
+
+def _normalize_ts(raw: str) -> str:
+    """快照时间戳归一为 HH:MM:SS（C010）：腾讯实测字段 30 为
+    YYYYMMDDHHMMSS（无冒号）；带冒号旧口径原样通过，其余原样透传由
+    消费端跳过（不再折叠为固定桶）。"""
+    s = raw.strip()
+    if len(s) == 14 and s.isdigit():
+        return f"{s[8:10]}:{s[10:12]}:{s[12:14]}"
+    return s
+
 # 字段位（0 起）：3 现价 4 昨收 5 今开 6 成交量 30 时间 33 最高 34 最低 47 涨停 48 跌停
 # 9–18 买一~买五（价/量交替），19–28 卖一~卖五（价/量交替），36 成交量(手) 37 成交额(万)
 _F_LAST, _F_PREV, _F_OPEN = 3, 4, 5
@@ -92,7 +102,8 @@ def parse_quote_payload(text: str) -> list[NormalizedQuote]:
         if suspended:
             quotes.append(NormalizedQuote(
                 code=code, name=fields[1], last=0.0, prev_close=_num(fields[_F_PREV]),
-                open=_num(fields[_F_OPEN]), high=0.0, low=0.0, cum_volume=0, ts=fields[_F_TIME],
+                open=_num(fields[_F_OPEN]), high=0.0, low=0.0, cum_volume=0,
+                ts=_normalize_ts(fields[_F_TIME]),
             ))
             continue
         quotes.append(NormalizedQuote(
@@ -101,7 +112,8 @@ def parse_quote_payload(text: str) -> list[NormalizedQuote]:
             high=round(_num(fields[_F_HIGH]), 2), low=round(_num(fields[_F_LOW]), 2),
             cum_volume=_to_shares(code, _num(fields[_F_VOL])),
             bids=_levels(fields, _F_BID1, code), asks=_levels(fields, _F_ASK1, code),
-            ts=fields[_F_TIME], amount_wan=_num(fields[37]) if len(fields) > 37 else 0.0,
+            ts=_normalize_ts(fields[_F_TIME]),
+            amount_wan=_num(fields[37]) if len(fields) > 37 else 0.0,
         ))
     return quotes
 
