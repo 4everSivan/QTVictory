@@ -18,22 +18,3 @@
   --font-price: 'Doto', 'Space Mono', monospace;
 }
 
-/* 01 §3.3 终端深蓝备选皮肤 */
-:root[data-theme='terminal'] {
-  --bg: #0a0d12;
-  --surface: #10141b;
-  --raised: #161c26;
-  --line: #222a38;
-  --line2: #3a4a63;
-  --txt: #e6edf3;
-  --txt2: #8b98a9;
-  --txt3: #5c6b7f;
-  --up: #f04752;
-  --down: #2ebd85;
-  --warn: #d4a843;
-  --acc: #4a9eff;
-  --dim: rgba(255, 255, 255, 0.12);
-  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-num: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  --font-price: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-}

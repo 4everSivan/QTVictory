@@ -15,6 +15,7 @@
 ---
 
 ### 变更 (Changed)
+- **主题收敛为单一 Nothing 深色套系**：移除终端深蓝备选皮肤、顶栏主题切换按钮与主题持久化机制，全站唯一主题。详见变更卡 [C004](docs/devel/change/C004-主题收敛为单一Nothing深色套系.md)。（其移除的切换机制已由 C002 以三态形态重建。）
 - **`GET /api/traders/{id}` 详情响应增补 `strategyParams`**：返回当前生效策略参数（manual 为 null），前端交易员编辑弹窗以此回填，消除模板默认值静默覆盖自定义参数的风险。详见变更卡 [C003](docs/devel/change/C003-交易员编辑态strategyParams读取端点.md)。
 
 ---
