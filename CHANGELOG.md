@@ -22,6 +22,7 @@
 ---
 
 ### 维护与修复 (Fixed)
+- **滚动条样式缺失**：生产移植丢失 v1 原型的全局细滚动条样式，逐笔成交/下单面板等溢出区域露出浏览器原生粗亮滚动条。已补回全局 8px 细条（`--line2` thumb / 透明 track / Firefox `scrollbar-width: thin`），深浅套系令牌驱动自适应。详见变更卡 [C005](docs/devel/change/C005-滚动条样式缺失修复.md)。
 - **日K 引导入库元组缺 code 导致 klines 表永空**：`TencentAdapter.fetch_daily_klines` 返回 6 元组与 `DataStore.upsert_klines` 的 7 元组契约不匹配，启动引导静默失败，前端"日K"页签永远空白。已对齐为 7 元组契约并补适配器→store 契约回归测试。详见变更卡 [C001](docs/devel/change/C001-修复日K引导入库元组缺code.md)。
 
 ---

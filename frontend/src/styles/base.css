@@ -41,6 +41,26 @@ body {
   color: var(--txt2);
 }
 
+/* 全局滚动条（01 §3.2，C005）：8px 细条、令牌驱动低对比、透明轨道，深浅套系自适应 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line2) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--txt3);
+}
+
 /* 一屏五区栅格（01 §2.2，v1 定稿） */
 .app {
   display: grid;
