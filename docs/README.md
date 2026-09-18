@@ -153,7 +153,9 @@ docs/
 #### ⑤ 验收与评估报告 (`docs/devel/report/` & `docs/devel/assessment/`) —— 审计快照模型
 - **文件命名**:
   - 验收报告: `两位数字-M[编号]-验收报告.md`（例：`01-M8-验收报告.md`、`02-M16-前端验收报告.md`）
-  - 评估报告: `两位数字-名称.md`（例：`01-评分标准.md`、`03-评分报告.md`）
+  - 评估体系（双属性模型）:
+    - 评分规则（通用基线，常驻 devel 不归档）: `01-评分标准.md`、`02-评分流程与证据清单.md`
+    - 评分报告（审计快照，随版本归档）: `两位数字-评分报告[-轮次].md`（例：`03-评分报告.md`）
 - **报告 ID**: `R-M[编号]`、`R-ASSESS-[编号]`
 - **结论枚举**: `通过` ｜ `受限通过` ｜ `未通过`
 - **说明**: 机器证据快照与环境配置在正文“测试环境与证据快照”小节详述。
@@ -197,8 +199,8 @@ docs/
 - **编号与度量口径**：前缀语义（BG/EN/FT/TD）+ 四位序号只增不复用、严重度 S1–S4 与优先级 P0–P3 受控枚举、版本文件生命周期与标准表模板，详见 [todo/README.md](devel/todo/README.md) §2–§5。
 
 #### ⑨ 历史版本归档库（`docs/archive/`）—— 只读快照模型
-- **归档时机**：每次打出版本 tag 后，将该版本的 `plan/`、`task/`、`report/`、`assessment/` 从 `docs/devel/` 整体迁移至 `docs/archive/<版本号>/`；
-- **只读封存**：归档文档一律不再修改；活文档（design / change / todo / env）始终留在 `docs/devel/` 不归档；
+- **归档时机**：每次打出版本 tag 后，将该版本的 `plan/`、`task/`、`report/` 整体以及 `assessment/` 下的具体评分报告从 `docs/devel/` 迁移至 `docs/archive/<版本号>/`；
+- **只读封存与规则常驻**：归档文档一律不再修改；活文档（design / change / todo / env）及评分规则体系（`assessment/` 下的标准与流程）始终留在 `docs/devel/` 不归档；
 - **细则与 SOP**：见 [archive/README.md](archive/README.md)。
 
 

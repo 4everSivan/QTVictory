@@ -56,6 +56,6 @@
 
 - 设计事实源：`docs/devel/design/`（01 前端 / 02 后端）
 - 变更核验：`docs/devel/change/`
-- 待办与需求缓冲池：`docs/devel/todo/`（表格化记录未入轨需求与缺陷，落地即移出，零沉淀）
-- 验收证据：`docs/devel/report/`、`docs/devel/assessment/`（版本 tag 后归档至 `docs/archive/`，SOP 见 `docs/archive/README.md`）
+- 验收证据：`docs/devel/report/`（全量归档）、`docs/devel/assessment/`（仅归档评分报告，评分规则常驻；版本 tag 后按 [docs/archive/README.md](docs/archive/README.md) SOP 归档）
 - 部署运维：`docs/guide/`（01 单机部署运维 / 02 测试环境部署）
+

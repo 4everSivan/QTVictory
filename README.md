@@ -209,7 +209,7 @@ QTVictory 建立了极为严格的**文档先行（Documentation-First）**与**
 2. **待办缓冲池（零沉淀纪律）**：所有未入轨事项在 `docs/devel/todo/`（`now.md` / `future.md`）以表格登记。一旦事项建立 C 卡或落入设计稿，**必须立即从 todo 表格中物理删除**，`todo/` 坚决不保留 `[x]` 历史勾选项；
 3. **设计方案活基线与双向回链**：`docs/devel/design/` 保持“全文自洽”。变更涉及设计规则时，必须在对应设计章节原位嵌入反向引用标签（`> 📌 **关联变更**: [C00x]...`），文档头部追加 C 编号，文末变更记录补充回链，彻底消除单向孤岛；
 4. **AI 会话核验代签机制**：变更卡核验不要求人工手签，由 AI 执行自动化测试与实测后向人工汇报；人工在会话中确认无误后，由 AI 代签签署收口并记录会话确认凭证；
-5. **历史版本归档库（只读封存）**：版本打出 Tag 后，该版本的 `plan/`、`task/`、`report/`、`assessment/` 按 [docs/archive/README.md](docs/archive/README.md) SOP 整体物理迁移至 `docs/archive/<版本号>/` 只读封存；活文档（`design/`、`change/`、`todo/`、`env/`）常驻 `devel/` 持续轮转；
+5. **历史版本归档库（只读封存）**：版本打出 Tag 后，该版本的 `plan/`、`task/`、`report/` 整体以及 `assessment/` 下的评分报告按 [docs/archive/README.md](docs/archive/README.md) SOP 物理迁移至 `docs/archive/<版本号>/` 只读封存；评分规则（标准与流程）及活文档（`design/`、`change/`、`todo/`、`env/`）常驻 `devel/` 持续轮转；
 6. **测试环境隔离红线**：本地测试实例运行必须与生产默认完全隔离（端口强制 `8788`、数据库强制 `local/data/qtvictory_test.db`，所有测试过程产物收拢至 `local/`，严禁污染源码树）。
 
 ### 4.3 完整文档地图
@@ -225,7 +225,7 @@ QTVictory 建立了极为严格的**文档先行（Documentation-First）**与**
 | [**`docs/devel/plan/`**](docs/devel/plan/) | Phase 1 里程碑计划（M1–M16），Phase 1 已整体收口冻结 | 只读封存 |
 | [**`docs/devel/task/`**](docs/devel/task/) | Phase 1 执行任务卡（T01–T22），Phase 1 已整体收口冻结 | 只读封存 |
 | [**`docs/devel/report/`**](docs/devel/report/) | 阶段终验报告：[01-M8 后端终验](docs/devel/report/01-M8-验收报告.md) 与 [02-M16 前端终验](docs/devel/report/02-M16-前端验收报告.md) | 阶段收口 |
-| [**`docs/devel/assessment/`**](docs/devel/assessment/) | AI Agent 研发质量评估与证据体系报告 | 定稿归档 |
+| [**`docs/devel/assessment/`**](docs/devel/assessment/) | AI Agent 研发质量评估体系：[评分标准与流程](docs/devel/assessment/README.md)（规则常驻）+ [评分报告](docs/devel/assessment/03-评分报告.md)（随版本归档） | 规则现行 / 报告待归档 |
 | [**`docs/devel/env/`**](docs/devel/env/) | [01-环境缓存与依赖清理指南](docs/devel/env/01-环境缓存与依赖清理指南.md)，指导磁盘与缓存治理 | 现行有效 |
 | [**`docs/archive/`**](docs/archive/) | 历史版本只读封存库：包含 [归档库索引与操作 SOP](docs/archive/README.md) | 待打 Tag 归档 |
 | [**`docs/guide/`**](docs/guide/) | 用户与运维手册：[01-单机部署运维](docs/guide/01-单机部署与运维指南.md) 与 [02-测试环境部署](docs/guide/02-测试环境部署指南.md) | 正式发布 |
