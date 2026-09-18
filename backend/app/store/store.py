@@ -63,13 +63,14 @@ class Store:
         return dict(row) if row else None
 
     def list_traders(self, include_deleted: bool = False) -> list[dict[str, Any]]:
-        stmt = "SELECT * FROM traders"
         with self.db.lock:
             if include_deleted:
-                rows = self.db.conn.execute(stmt + " ORDER BY id").fetchall()
+                rows = self.db.conn.execute(
+                    "SELECT * FROM traders ORDER BY id"
+                ).fetchall()
             else:
                 rows = self.db.conn.execute(
-                    stmt + " WHERE status != ? ORDER BY id", ("deleted",)
+                    "SELECT * FROM traders WHERE status != ? ORDER BY id", ("deleted",)
                 ).fetchall()
         return [dict(r) for r in rows]
 
