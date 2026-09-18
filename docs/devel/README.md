@@ -19,7 +19,7 @@
 - **[assessment/](assessment/README.md)** —— AI Agent 研发质量量化评估体系与报告；
 - **[todo/](todo/README.md)** —— 待办与需求缓冲池，未入轨缺陷与需求的登记表（落地即移出，零沉淀）。
 
-> 📌 **归档约定**：版本 tag 打出后，plan/、task/、report/、assessment/ 将按 [docs/archive/README.md](../archive/README.md) 的 SOP 整体迁移至 `docs/archive/<版本号>/` 封存（只读）；当前尚未归档。
+> 📌 **归档约定**：版本 tag 打出后，plan/、task/、report/ 整体以及 assessment/ 下的评分报告将按 [docs/archive/README.md](../archive/README.md) 的 SOP 迁移至 `docs/archive/<版本号>/` 封存（只读）；评分规则（01/02）与活文档（design/change/todo/env）常驻 devel 持续演进；当前尚未归档。
 
 当前状态：Phase 1 模拟底座与观察员控制台双线（M1–M16 / T01–T22）均已收口并通过终验。项目总览见根 [README.md](../../README.md)。
 
@@ -36,7 +36,7 @@ docs/devel/
 ├── task/              # 【任务规格】原子任务卡 T01–T22
 ├── report/            # 【阶段验收】M8 / M16 终验报告
 ├── env/               # 【环境治理】缓存依赖盘点与清理指南
-├── assessment/        # 【研发评估】Agent 评分标准、流程与报告
+├── assessment/        # 【研发评估】Agent 评分标准与流程（常驻）+ 评分报告（随版本归档）
 └── todo/              # 【待办缓冲】未入轨缺陷与需求登记表（落地即移出）
 ```
 
@@ -46,13 +46,13 @@ docs/devel/
 
 | 目录 | 索引文档 | 核心职责 | 现行状态 |
 |---|---|---|---|
-| **design/** | [design/README.md](design/README.md) | 包含 [01-前端设计方案](design/01-前端设计方案.md) (v4.3) 与 [02-后端设计方案](design/02-后端设计方案.md) (v4.0)，为系统现行真理 | 现行基线 |
+| **design/** | [design/README.md](design/README.md) | 包含 [01-前端设计方案](design/01-前端设计方案.md) (v4.3) 与 [02-后端设计方案](design/02-后端设计方案.md) (v5.0)，为系统现行真理 | 现行基线 |
 | **change/** | [change/README.md](change/README.md) | 承载 Bug 修复与回调的核验流，提供 [template.md](change/template.md) 变更卡模板与前后对比 Checklist | 持续演进 |
 | **plan/** | [plan/README.md](plan/README.md) | 包含 [00-总体开发计划](plan/00-总体开发计划.md)、[00-前端开发计划](plan/00-前端开发计划.md) 与 M1–M16 里程碑 | Phase 1 收口 |
 | **task/** | [task/README.md](task/README.md) | 包含 T01–T14（后端）与 T15–T22（前端）共 22 篇任务细化规格卡 | 全量完成 |
 | **report/** | [report/README.md](report/README.md) | 包含 [01-M8-验收报告](report/01-M8-验收报告.md) 与 [02-M16-前端验收报告](report/02-M16-前端验收报告.md) | 阶段收口 |
 | **env/** | [env/README.md](env/README.md) | 包含 [01-环境缓存与依赖清理指南](env/01-环境缓存与依赖清理指南.md)，指导磁盘与缓存治理 | 现行有效 |
-| **assessment/** | [assessment/README.md](assessment/README.md) | 包含评分标准、执行流程与 AI Agent 研发质量评估最终报告 | 已定稿 |
+| **assessment/** | [assessment/README.md](assessment/README.md) | 包含评分标准、执行流程（通用规则常驻）与 AI Agent 研发质量评估报告（随版本归档） | 规则现行 / 报告待归档 |
 | **todo/** | [todo/README.md](todo/README.md) | 未入轨缺陷与需求的缓冲池（[now.md](todo/now.md)、[future.md](todo/future.md)），落地即移出、零沉淀 | 持续轮转 |
 
 ---

@@ -22,7 +22,7 @@ export interface SessionState {
 }
 
 export interface MarketStatus {
-  source: 'tencent' | 'eastmoney' | 'anchor'
+  source: 'tencent' | 'sina' | 'eastmoney' | 'anchor'
   live: boolean
   ageSec: number | null
 }
@@ -50,11 +50,13 @@ export interface QuotesEnvelope {
   quotes: Quote[]
 }
 
-/** 行情质量：live=true 且源为 tencent 视为实时，否则降级 */
+/** 行情质量：live=true 且源为完整档（tencent/sina，含五档与增量量）视为实时，否则降级 */
 export type QuoteQuality = 'live' | 'fallback'
 
+const FULL_SOURCES: ReadonlySet<MarketStatus['source']> = new Set(['tencent', 'sina'])
+
 export function quoteQuality(env: Pick<QuotesEnvelope, 'source' | 'live'>): QuoteQuality {
-  return env.live && env.source === 'tencent' ? 'live' : 'fallback'
+  return env.live && FULL_SOURCES.has(env.source) ? 'live' : 'fallback'
 }
 
 export interface KlineRow {

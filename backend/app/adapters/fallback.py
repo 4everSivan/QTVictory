@@ -35,6 +35,8 @@ class EastmoneyAdapter:
     """东财备用源（T06-1 备源）：快照价格级（无五档字段位 → 无盘口，
     撮合按降级档处理，fill_model=fallback）。"""
 
+    KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+
     def __init__(self, client: Any):
         self.client = client
 
@@ -68,4 +70,26 @@ class EastmoneyAdapter:
                 ))
             except Exception:
                 continue
+        return out
+
+    async def fetch_daily_klines(self, code: str, limit: int = 320) -> list[tuple]:
+        """日K兜底（C008）：push2his 前复权，量纲手（与腾讯 ifzq 一致），
+        7 元组契约 [(code, date, open, close, high, low, volume)]。"""
+        resp = await self.client.get(
+            self.KLINE_URL,
+            params={
+                "secid": self._secid(code),
+                "klt": "101", "fqt": "1", "lmt": limit,
+                "fields1": "f1,f2,f3,f4,f5,f6",
+                "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
+            },
+        )
+        resp.raise_for_status()
+        rows = (resp.json().get("data") or {}).get("klines") or []
+        out: list[tuple] = []
+        for row in rows:
+            # "date,open,close,high,low,volume,..."（fields2 顺序）
+            p = row.split(",")
+            out.append((code, p[0], float(p[1]), float(p[2]), float(p[3]),
+                        float(p[4]), int(float(p[5]))))
         return out

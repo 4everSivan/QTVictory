@@ -1,9 +1,11 @@
 """行情服务（T06，02 §3.4 / §6.5）。
 
 - 轮询：连续竞价 QTV_POLL_SEC / 休市 60s；超时 5s；连续 3 败熔断 60s 切换；
-- 三级降级链：腾讯 → 东财 → 内置锚点，透出 source/live；
+- 降级链（C008）：腾讯（https→http 协议兜底）→ 新浪 → 东财 → 内置锚点，
+  透出 source/live；新浪档含五档与累计量，视同主源完整档；
 - 内存最新档（MarketBus）+ ΔV 差分 + 停牌标志 + 新鲜度时钟（>30s）；
-- 日K 全量启动拉取 + 每日增量；分钟线当日累积、日切落库；
+- 日K 全量启动拉取（腾讯 ifzq → 东财 push2his 兜底）+ 每日增量；
+  分钟线当日累积、日切落库；
 - 交易日历由快照时间戳推定；关注代码集 = 持仓 ∪ 计划池 ∪ 指数。
 
 测试经 inject / sync_klines 离线注入（不触网）。
@@ -18,6 +20,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from app.adapters.fallback import EastmoneyAdapter, FallbackProvider
+from app.adapters.sina import SinaAdapter
 from app.adapters.tencent import NormalizedQuote, TencentAdapter
 from app.domain.engine import BookLevel, Tick
 
@@ -32,7 +35,7 @@ class MarketService:
         self.snapshots: dict[str, NormalizedQuote] = {}
         self._last_cum: dict[str, int] = {}
         self._last_cum_date: dict[str, str] = {}
-        self.source: str = "tencent"      # tencent | eastmoney | anchor
+        self.source: str = "tencent"      # tencent | sina | eastmoney | anchor
         self.live: bool = False           # anchor 模式为 False
         self.last_update: datetime | None = None
         self._fail_streak = 0
@@ -43,6 +46,7 @@ class MarketService:
         self._watch_override: set[str] | None = None
         self._client: Any = None
         self._tencent: TencentAdapter | None = None
+        self._sina: SinaAdapter | None = None
         self._eastmoney: EastmoneyAdapter | None = None
         self.fallback = FallbackProvider()
 
@@ -53,6 +57,7 @@ class MarketService:
 
         self._client = httpx.AsyncClient(timeout=5.0)
         self._tencent = TencentAdapter(self._client)
+        self._sina = SinaAdapter(self._client)
         self._eastmoney = EastmoneyAdapter(self._client)
         self.live = True
         asyncio.create_task(self._bootstrap_klines())
@@ -89,7 +94,7 @@ class MarketService:
                 codes.update(scope.get("codes", []))
         return sorted(codes)
 
-    # -- 轮询与三级降级链（T06-1/T06-3） ----------------------------------
+    # -- 轮询与降级链（T06-1/T06-3，C008 扩充） ---------------------------
 
     async def _poll_loop(self) -> None:
         while True:
@@ -119,15 +124,16 @@ class MarketService:
                 raise RuntimeError("empty payload")
         except Exception:
             self._fail_streak += 1
-            if self._fail_streak >= 3:  # 熔断：切东财，再败进锚点闭锁 60s
-                try:
-                    quotes = await self._eastmoney.fetch_quotes(codes)
-                except Exception:
-                    quotes = []
-                if quotes:
-                    self.source, self.live = "eastmoney", True
-                    self._ingest(quotes, now)
-                    return
+            if self._fail_streak >= 3:  # 熔断：走备源链（新浪→东财），再灭进锚点闭锁 60s
+                for source, adapter in (("sina", self._sina), ("eastmoney", self._eastmoney)):
+                    try:
+                        quotes = await adapter.fetch_quotes(codes)
+                    except Exception:
+                        continue
+                    if quotes:
+                        self.source, self.live = source, True
+                        self._ingest(quotes, now)
+                        return
                 self.source, self.live = "anchor", False
                 self._circuit_until = now + timedelta(seconds=60)
                 self._fail_streak = 0
@@ -157,7 +163,8 @@ class MarketService:
     def _ingest(self, quotes: list[NormalizedQuote], now: datetime) -> None:
         self.last_update = now
         today = now.strftime("%Y-%m-%d")
-        degraded = self.source != "tencent"
+        # C008：新浪档含五档与累计量，视同主源完整档；仅东财/锚点为降级档
+        degraded = self.source not in ("tencent", "sina")
         ticks: list[Tick] = []
         for q in quotes:
             prev_cum = self._last_cum.get(q.code, 0)
@@ -251,7 +258,11 @@ class MarketService:
     async def _bootstrap_klines(self) -> None:
         try:
             for code in self.watchlist():
-                rows = await self._tencent.fetch_daily_klines(code)
+                try:
+                    rows = await self._tencent.fetch_daily_klines(code)
+                except Exception:
+                    # C008：K线兜底——东财 push2his（前复权日K，量纲与腾讯一致）
+                    rows = await self._eastmoney.fetch_daily_klines(code)
                 if rows:
                     await asyncio.to_thread(self.ctx.store.upsert_klines, rows)
             log.info("kline bootstrap done")

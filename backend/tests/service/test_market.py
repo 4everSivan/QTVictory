@@ -1,5 +1,8 @@
 """T06：腾讯解析 / ΔV 差分 / 降级状态 / 分钟累积 / 交易日历推定。"""
 
+import asyncio
+
+from app.adapters.sina import parse_sina_payload
 from app.adapters.tencent import NormalizedQuote, TencentAdapter, parse_quote_payload
 from tests.harness import inject, make_app, quote
 
@@ -50,6 +53,193 @@ class TestParse:
         f[3] = "0.00"; f[5] = "0.00"
         [q] = parse_quote_payload(f'v_sh600519="{"~".join(f)}";')
         assert q.last == 0.0  # 停牌
+
+
+def _sina_line(code: str = "sh600519", *, zero_book: bool = False) -> str:
+    """构造一条合法的新浪快照响应（字段位与真实接口一致，量纲：股）。"""
+    f = ["0"] * 33
+    f[0] = "贵州茅台"
+    f[1] = "1262.990"   # 今开
+    f[2] = "1266.980"   # 昨收
+    f[3] = "1258.880"   # 现价
+    f[4] = "1265.880"   # 最高
+    f[5] = "1258.200"   # 最低
+    f[8] = "957073"     # 成交量（股）
+    f[9] = "1206982486.000"  # 成交额（元）
+    if not zero_book:
+        # 10–19 买五档（量/价交替，量：股）
+        for i, (p, v) in enumerate(
+            [(1258.87, 100), (1258.86, 100), (1258.85, 400), (1258.82, 100), (1258.81, 200)]
+        ):
+            f[10 + i * 2] = str(v)
+            f[11 + i * 2] = f"{p:.2f}"
+        # 20–29 卖五档
+        for i, (p, v) in enumerate(
+            [(1259.00, 200), (1259.17, 1200), (1259.18, 200), (1259.23, 100), (1259.38, 100)]
+        ):
+            f[20 + i * 2] = str(v)
+            f[21 + i * 2] = f"{p:.2f}"
+    f[30] = "2026-09-18"
+    f[31] = "10:59:57"
+    return f'var hq_str_{code}="{",".join(f)}";'
+
+
+class TestSinaParse:
+    """C008：新浪快照解析（字段位 / 五档量纲 / 成交额归一）。"""
+
+    def test_fields_and_five_levels(self):
+        [q] = parse_sina_payload(_sina_line())
+        assert q.code == "sh600519" and q.name == "贵州茅台"
+        assert q.last == 1258.88 and q.prev_close == 1266.98
+        assert q.open == 1262.99 and q.high == 1265.88 and q.low == 1258.20
+        assert len(q.bids) == 5 and len(q.asks) == 5
+        assert q.bids[0] == (1258.87, 100)   # 量纲已是股，无手换算
+        assert q.asks[0] == (1259.00, 200)
+        assert q.cum_volume == 957073
+        assert q.amount_wan == 120698.25     # 元 → 万
+        assert q.ts == "10:59:57"
+
+    def test_index_zero_book_skipped(self):
+        [q] = parse_sina_payload(_sina_line("sh000300", zero_book=True))
+        assert q.code == "sh000300"
+        assert q.bids == [] and q.asks == []  # 指数无盘口：价量非正自然跳过
+
+    def test_suspended_detected(self):
+        line = _sina_line()
+        line = line.replace("1262.990", "0.000", 1).replace("1258.880", "0.000", 1)
+        [q] = parse_sina_payload(line)
+        assert q.last == 0.0  # 现价与今开均 ≤0 判停牌
+
+
+class _FakeAdapter:
+    """离线替身：可控返回快照或抛错。"""
+
+    def __init__(self, quotes: list[NormalizedQuote] | None = None, dead: bool = False):
+        self._quotes = quotes or []
+        self._dead = dead
+
+    async def fetch_quotes(self, codes):
+        if self._dead:
+            raise RuntimeError("source dead")
+        return self._quotes
+
+
+class TestFallbackChain:
+    """C008：腾讯(https/http) → 新浪 → 东财 → 锚点 降级次序与档位语义。"""
+
+    async def _drive(self, ctx, times: int = 1):
+        for _ in range(times):
+            await ctx.market.poll_once()
+        for _ in range(200):  # 等串行基座跑完（同 harness.inject 口径）
+            if ctx.serial._queue.empty():  # noqa: SLF001
+                await asyncio.sleep(0)
+                break
+            await asyncio.sleep(0.005)
+
+    async def test_tencent_primary_unchanged(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            ctx.market._tencent = _FakeAdapter([quote()])
+            ctx.market._sina = _FakeAdapter(dead=True)
+            await self._drive(ctx)
+            assert ctx.market.status()["source"] == "tencent"
+            assert ctx.market.live
+        finally:
+            await ctx.stop()
+
+    async def test_sina_full_grade_with_delta_volume(self):
+        """新浪档非 degraded：ΔV 差分正常，source=sina。"""
+        _, ctx = make_app()
+        captured: list = []
+        orig = ctx.trading.on_ticks
+
+        async def spy(ticks):
+            captured.extend(ticks)
+
+        ctx.trading.on_ticks = spy
+        await ctx.start()
+        try:
+            ctx.market._tencent = _FakeAdapter(dead=True)
+            ctx.market._sina = _FakeAdapter([quote(cum=2_000_000)])
+            ctx.market._eastmoney = _FakeAdapter(dead=True)
+            await self._drive(ctx, 3)          # 3 败熔断 → 落到新浪
+            assert ctx.market.status()["source"] == "sina"
+            assert ctx.market.live
+            ctx.market._sina = _FakeAdapter([quote(cum=2_006_000)])
+            await self._drive(ctx)             # 熔断态直接走备源链
+            assert captured[-1].delta_volume == 6_000  # 完整档：差分增量
+        finally:
+            ctx.trading.on_ticks = orig
+            await ctx.stop()
+
+    async def test_eastmoney_degraded_zero_delta(self):
+        """东财档 degraded：无增量量（撮合回落 fallback 模型）。"""
+        _, ctx = make_app()
+        captured: list = []
+        orig = ctx.trading.on_ticks
+
+        async def spy(ticks):
+            captured.extend(ticks)
+
+        ctx.trading.on_ticks = spy
+        await ctx.start()
+        try:
+            ctx.market._tencent = _FakeAdapter(dead=True)
+            ctx.market._sina = _FakeAdapter(dead=True)
+            ctx.market._eastmoney = _FakeAdapter([quote(cum=3_000_000)])
+            await self._drive(ctx, 3)
+            assert ctx.market.status()["source"] == "eastmoney"
+            assert ctx.market.live
+            assert captured[-1].delta_volume == 0
+        finally:
+            ctx.trading.on_ticks = orig
+            await ctx.stop()
+
+    async def test_all_dead_anchor_circuit(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            await inject(ctx, quote())         # 种子锚点
+            ctx.market._tencent = _FakeAdapter(dead=True)
+            ctx.market._sina = _FakeAdapter(dead=True)
+            ctx.market._eastmoney = _FakeAdapter(dead=True)
+            await self._drive(ctx, 3)
+            assert ctx.market.status()["source"] == "anchor"
+            assert not ctx.market.live
+            assert ctx.market._circuit_until is not None  # 60s 闭锁
+        finally:
+            await ctx.stop()
+
+
+class TestKlineBootstrapFallback:
+    """C008：日K 引导 腾讯 ifzq → 东财 push2his 兜底。"""
+
+    class _DeadTencent:
+        async def fetch_daily_klines(self, code, limit=320):
+            raise RuntimeError("kline source dead")
+
+    class _EastKline:
+        def __init__(self):
+            self.called: list[str] = []
+
+        async def fetch_daily_klines(self, code, limit=320):
+            self.called.append(code)
+            return [(code, "2026-09-17", 4460.0, 4486.0, 4490.0, 4450.0, 142000)]
+
+    async def test_falls_back_to_eastmoney(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            east = self._EastKline()
+            ctx.market._tencent = self._DeadTencent()
+            ctx.market._eastmoney = east
+            await ctx.market._bootstrap_klines()
+            assert east.called == ["sh000300"]  # 关注集（离线）= 指数
+            got = ctx.store.klines_for("sh000300", limit=1)
+            assert len(got) == 1 and got[0]["close"] == 4486.0
+        finally:
+            await ctx.stop()
 
 
 class TestMarketRuntime:

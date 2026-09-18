@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 QUOTE_URL = "https://qt.gtimg.cn/q="
+QUOTE_URL_HTTP = "http://qt.gtimg.cn/q="
 KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
 
 # 字段位（0 起）：3 现价 4 昨收 5 今开 6 成交量 30 时间 33 最高 34 最低 47 涨停 48 跌停
@@ -101,8 +102,13 @@ class TencentAdapter:
     async def fetch_quotes(self, codes: list[str]) -> list[NormalizedQuote]:
         if not codes:
             return []
-        resp = await self.client.get(QUOTE_URL + ",".join(codes))
-        resp.raise_for_status()
+        try:
+            resp = await self.client.get(QUOTE_URL + ",".join(codes))
+            resp.raise_for_status()
+        except Exception:
+            # C008：快照域 https 可能被网络环境阻断（http 实测可达），同解析器协议兜底
+            resp = await self.client.get(QUOTE_URL_HTTP + ",".join(codes))
+            resp.raise_for_status()
         return parse_quote_payload(resp.content.decode("gbk", errors="replace"))
 
     async def fetch_daily_klines(self, code: str, limit: int = 320) -> list[tuple]:
