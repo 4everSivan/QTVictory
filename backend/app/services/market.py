@@ -5,7 +5,8 @@
   透出 source/live；新浪档含五档与累计量，视同主源完整档；
 - 内存最新档（MarketBus）+ ΔV 差分 + 停牌标志 + 新鲜度时钟（>30s）；
 - 日K 全量启动拉取（腾讯 ifzq → 东财 push2his 兜底）+ 每日增量；
-  分钟线当日累积、日切落库；新增自选码异步单码引导（T23，串行排队）；
+  分钟线当日累积、新分钟桶触发增量落库（C012）、日切收口、停机兜底；
+  新增自选码异步单码引导（T23，串行排队）；
 - 交易日历由快照时间戳推定；关注代码集 = 自选 ∪ 持仓 ∪ 计划池 ∪ 指数。
 
 测试经 inject / sync_klines 离线注入（不触网）。
@@ -47,6 +48,8 @@ class MarketService:
         self._task: asyncio.Task | None = None
         self._minute_bars: dict[tuple[str, str], tuple[float, int]] = {}
         self._minute_date: str = ""
+        self._minute_dirty: bool = False                       # 新分钟桶待刷盘（C012）
+        self._minute_flush_tasks: set[asyncio.Task] = set()
         self._watch_override: set[str] | None = None
         self._kline_boot_lock = asyncio.Lock()      # 自选码日K 引导串行排队（T23-3）
         self._kline_boot_tasks: set[asyncio.Task] = set()
@@ -81,6 +84,10 @@ class MarketService:
             task.cancel()
         if self._kline_boot_tasks:
             await asyncio.gather(*self._kline_boot_tasks, return_exceptions=True)
+        for task in self._minute_flush_tasks:
+            task.cancel()
+        if self._minute_flush_tasks:
+            await asyncio.gather(*self._minute_flush_tasks, return_exceptions=True)
         if self._client is not None:
             await self._client.aclose()
 
@@ -198,6 +205,9 @@ class MarketService:
                 ts=now.isoformat(timespec="seconds"),
             ))
         self._rollover_trading_date(now)
+        if self._minute_dirty:
+            self._minute_dirty = False
+            self._schedule_minute_flush()
         self.ctx.bus.publish("quotes", self.quotes_payload())
         if ticks:
             # §4.4：同一串行基座，PlanEngine.tick 先于 MatchingEngine.tick
@@ -216,8 +226,33 @@ class MarketService:
         if not minute:
             return
         key = (q.code, minute)
+        if key not in self._minute_bars:
+            self._minute_dirty = True   # 进入新分钟桶：触发增量刷盘（C012）
         price, _ = self._minute_bars.get(key, (q.last, 0))
         self._minute_bars[key] = (price, q.cum_volume)
+
+    def _schedule_minute_flush(self) -> None:
+        task = asyncio.create_task(self._flush_minutes_task(), name="minute-flush")
+        self._minute_flush_tasks.add(task)
+        task.add_done_callback(self._minute_flush_tasks.discard)
+
+    async def _flush_minutes_task(self) -> None:
+        try:
+            await self.flush_minutes()
+        except Exception:
+            log.warning("minute incremental flush failed", exc_info=True)
+
+    async def flush_minutes(self) -> int:
+        """当日分钟线增量落库（C012）：幂等 upsert 全量当前桶，崩溃/
+        重启损失收敛到当前未完成分钟；日切 persist_minutes 仍为最终收口。"""
+        date = self._minute_date
+        rows = [
+            (code, date, minute, price, vol)
+            for (code, minute), (price, vol) in self._minute_bars.items()
+        ]
+        if rows:
+            await asyncio.to_thread(self.ctx.store.upsert_minutes, rows)
+        return len(rows)
 
     def _rollover_trading_date(self, now: datetime) -> None:
         today = now.strftime("%Y-%m-%d")

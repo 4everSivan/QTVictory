@@ -75,6 +75,12 @@ class AppContext:
             log.warning("无鉴权模式：QTV_API_KEY 未配置，仅监听 127.0.0.1（私人使用定位）")
 
     async def stop(self) -> None:
+        # C012：停机终态刷盘当日分钟线（offline 同样生效——market.stop 在
+        # offline 下被跳过，兜底必须挂在这里才能覆盖测试与实盘两条路径）
+        try:
+            await self.market.flush_minutes()
+        except Exception:
+            log.exception("minute final flush on stop failed")
         if not self.offline:
             await self.market.stop()
         await self.serial.stop()

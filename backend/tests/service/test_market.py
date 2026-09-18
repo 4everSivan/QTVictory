@@ -325,6 +325,68 @@ class TestMarketRuntime:
         finally:
             await ctx.stop()
 
+    async def test_minute_incremental_flush_on_rollover(self):
+        """C012：进入新分钟桶自动增量落库（无需等日切）。"""
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            await inject(ctx, quote(ts="09:30:00"))  # 首桶即触发一次刷盘
+            tasks = set(ctx.market._minute_flush_tasks)
+            if tasks:
+                await asyncio.gather(*tasks)
+            assert {r["minute"] for r in ctx.store.minutes_for("sh600519", "2026-09-16")} == {"09:30"}
+            await inject(ctx, quote(cum=1_100_000, ts="09:31:00"))  # 新分钟桶 → 增量
+            tasks = set(ctx.market._minute_flush_tasks)
+            if tasks:
+                await asyncio.gather(*tasks)
+            rows = ctx.store.minutes_for("sh600519", "2026-09-16")
+            assert {r["minute"] for r in rows} == {"09:30", "09:31"}
+        finally:
+            await ctx.stop()
+
+    async def test_minute_flush_manual(self):
+        """C012：flush_minutes 幂等可重入，当日盘中即可读。"""
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            await inject(ctx, quote(ts="09:30:00"), quote(cum=1_050_000, ts="09:30:30"))
+            n1 = await ctx.market.flush_minutes()
+            n2 = await ctx.market.flush_minutes()  # 幂等重写
+            assert n1 == n2 == 1
+            assert ctx.store.minutes_for("sh600519", "2026-09-16")[0]["minute"] == "09:30"
+        finally:
+            await ctx.stop()
+
+    async def test_minute_stop_backstop(self):
+        """C012：Context.stop 终态刷盘兜底（offline 路径同样生效）。"""
+        _, ctx = make_app()
+        await ctx.start()
+        flushed = []
+        orig = ctx.market.flush_minutes
+
+        async def spy():
+            flushed.append(await orig())
+
+        ctx.market.flush_minutes = spy
+        try:
+            await inject(ctx, quote(ts="09:30:00"))
+        finally:
+            await ctx.stop()
+        assert flushed and flushed[0] >= 1  # stop 路径确实执行了终态刷盘
+
+    async def test_watchlist_scope_codes_normalized(self):
+        """C011：计划标的池裸码在关注集读取边界归一（存量行惰性愈合）。"""
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            t = await ctx.traders.create({"name": "t", "mode": "manual", "initCash": 100000})
+            ctx.store.insert_plan(t["id"], "裸码存量", json.dumps({"codes": ["601318"]}),
+                                  "{}", "{}", "{}", "{}", "2026-09-16 09:00:00")
+            assert "sh601318" in ctx.market.watchlist()
+            assert "601318" not in ctx.market.watchlist()
+        finally:
+            await ctx.stop()
+
     async def test_watchlist_dynamic(self):
         _, ctx = make_app()
         await ctx.start()
