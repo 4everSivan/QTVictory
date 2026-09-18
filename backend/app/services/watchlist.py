@@ -46,6 +46,21 @@ def code_candidates(raw: str) -> list[str]:
     return []
 
 
+def normalize_codes(raw_codes: list) -> tuple[list[str], list[str]]:
+    """标的码列表归一（C011，保序去重）：返回 (规范码, 无法归一的原始码)。
+    裸 6 位取板块规则主市场前缀（与探测序首候选同源，如 601318→sh601318、
+    000001→sz000001 个股语义）；带前缀直取。计划标的池写读两侧共用。"""
+    seen: dict[str, None] = {}
+    invalid: list[str] = []
+    for raw in raw_codes:
+        cands = code_candidates(str(raw))
+        if not cands:
+            invalid.append(str(raw))
+            continue
+        seen.setdefault(cands[0], None)
+    return list(seen), invalid
+
+
 class WatchlistService:
     def __init__(self, ctx):
         self.ctx = ctx

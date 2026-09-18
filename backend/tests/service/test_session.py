@@ -37,15 +37,15 @@ async def _seed_day(ctx):
     await inject(ctx, quote())
     # 建仓 1000 股 @10
     await ctx.trading.submit_order(tid, {
-        "side": "buy", "type": "market", "code": "600519", "qty": 1000,
+        "side": "buy", "type": "market", "code": "sh600519", "qty": 1000,
     })
     await inject(ctx, quote())
     # 挂一笔未成交买单（日终应撤）
     await ctx.trading.submit_order(tid, {
-        "side": "buy", "type": "limit", "code": "600519", "price": 9.90, "qty": 100,
+        "side": "buy", "type": "limit", "code": "sh600519", "price": 9.90, "qty": 100,
     })
     # 次日（09-17）除权：每股派息 0.50，10 送 1 转增 0.5
-    ctx.store.upsert_actions([("600519", "2026-09-17", 0.50, 0.1, 0.5, "2026-09-16", "test")])
+    ctx.store.upsert_actions([("sh600519", "2026-09-17", 0.50, 0.1, 0.5, "2026-09-16", "test")])
     return tid
 
 
@@ -55,7 +55,7 @@ class TestDayCut:
         await ctx.start()
         try:
             tid = await _seed_day(ctx)
-            pos = ctx.store.get_position(tid, "600519")
+            pos = ctx.store.get_position(tid, "sh600519")
             assert pos["qty"] == 1000 and pos["today_bought"] == 1000
 
             report = await ctx.session.day_cut("2026-09-16")
@@ -71,7 +71,7 @@ class TestDayCut:
             assert trader["cash"] == pytest_approx(
                 100000 - (10000 + 6.0) + 450)
             # 送转：1000 × (1 + 0.1 + 0.5) = 1600 股，成本摊薄
-            pos = ctx.store.get_position(tid, "600519")
+            pos = ctx.store.get_position(tid, "sh600519")
             assert pos["qty"] == 1600
             assert pos["avg_cost"] == pytest_approx((10000 + 6.0) / 1600)
             # T+1 重置 + 到账股份不占 today_bought（除权日即可卖）
@@ -86,11 +86,11 @@ class TestDayCut:
 
             # 幂等重入：全部步骤跳过，金额不变
             cash_before = ctx.store.get_trader(tid)["cash"]
-            qty_before = ctx.store.get_position(tid, "600519")["qty"]
+            qty_before = ctx.store.get_position(tid, "sh600519")["qty"]
             report2 = await ctx.session.day_cut("2026-09-16")
             assert all(v == "skipped" for v in report2["steps"].values())
             assert ctx.store.get_trader(tid)["cash"] == cash_before
-            assert ctx.store.get_position(tid, "600519")["qty"] == qty_before
+            assert ctx.store.get_position(tid, "sh600519")["qty"] == qty_before
         finally:
             await ctx.stop()
 
@@ -102,7 +102,7 @@ class TestDayCut:
         try:
             tid = await _seed_day(ctx)
             plan = await ctx.plans.create_plan({
-                "traderId": tid, "name": "p", "scope": {"codes": ["600519"]},
+                "traderId": tid, "name": "p", "scope": {"codes": ["sh600519"]},
                 "risk": {"validUntil": "2026-09-16"},
             })
             pid = plan["id"]

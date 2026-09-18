@@ -74,7 +74,7 @@ class TestEndpoints:
             "name": "t", "mode": "manual", "initCash": 200000})).json()["id"]
         ctx.market.inject([quote()])
         r = await c.post(f"/api/traders/{tid}/orders", json={
-            "side": "buy", "type": "limit", "code": "600519",
+            "side": "buy", "type": "limit", "code": "sh600519",
             "price": 10.21, "qty": 100,
         })
         body = r.json()
@@ -82,7 +82,7 @@ class TestEndpoints:
         assert set(body) == {"code", "message", "details"}  # 统一错误模型
         assert body["code"] == "PRICE_BAND"
         ok = await c.post(f"/api/traders/{tid}/orders", json={
-            "side": "buy", "type": "limit", "code": "600519", "price": 10.0, "qty": 100,
+            "side": "buy", "type": "limit", "code": "sh600519", "price": 10.0, "qty": 100,
             "clientOrderId": "ext-1",
         })
         assert ok.status_code == 201
@@ -98,8 +98,8 @@ class TestEndpoints:
         ctx.market.inject([quote()])
         q = (await c.get("/api/market/quotes")).json()
         assert q["source"] == "tencent" and q["quotes"]
-        ctx.market.sync_klines([("600519", "2026-09-15", 10, 10.2, 10.3, 9.9, 123)])
-        k = (await c.get("/api/market/kline", params={"code": "600519"})).json()
+        ctx.market.sync_klines([("sh600519", "2026-09-15", 10, 10.2, 10.3, 9.9, 123)])
+        k = (await c.get("/api/market/kline", params={"code": "sh600519"})).json()
         assert k["data"][-1]["close"] == 10.2
 
     async def test_plans_and_entries_crud(self, api):
@@ -107,7 +107,7 @@ class TestEndpoints:
         tid = (await c.post("/api/traders", json={
             "name": "t", "mode": "manual", "initCash": 100000})).json()["id"]
         plan = (await c.post(f"/api/traders/{tid}/plans", json={
-            "name": "p", "scope": {"codes": ["600519"]},
+            "name": "p", "scope": {"codes": ["sh600519"]},
             "risk": {"stopLossPct": 0.05},
         })).json()
         pid = plan["id"]
@@ -199,7 +199,7 @@ class TestExportEndpoint:
                 "name": "t", "mode": "manual", "initCash": 100000})).json()["id"]
             ctx.market.inject([quote()])
             await c.post(f"/api/traders/{tid}/orders", json={
-                "side": "buy", "type": "market", "code": "600519", "qty": 100})
+                "side": "buy", "type": "market", "code": "sh600519", "qty": 100})
             r = await c.get(f"/api/traders/{tid}/export",
                             params={"type": "trades", "format": "csv"})
             assert r.status_code == 200

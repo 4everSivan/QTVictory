@@ -12,10 +12,10 @@ async def _seed(ctx):
     tid = t["id"]
     await inject(ctx, quote())
     await ctx.trading.submit_order(tid, {
-        "side": "buy", "type": "market", "code": "600519", "qty": 1000,
+        "side": "buy", "type": "market", "code": "sh600519", "qty": 1000,
     })
     await inject(ctx, quote())
-    await ctx.plans.create_plan({"traderId": tid, "name": "p", "scope": {"codes": ["600519"]}})
+    await ctx.plans.create_plan({"traderId": tid, "name": "p", "scope": {"codes": ["sh600519"]}})
     ctx.store.upsert_snapshot(tid, "2026-09-15", 100000, 100000)
     ctx.store.upsert_snapshot(tid, "2026-09-16", 100500, 100500)
     return tid
@@ -52,7 +52,7 @@ class TestCsv:
             rows = list(csv.reader(io.StringIO(_drain(
                 ctx.exporter.csv_stream(tid, "positions")).lstrip("﻿"), newline="")))
             assert rows[0][0] == "code"
-            assert rows[1][0] == "600519" and int(rows[1][1]) == 1000
+            assert rows[1][0] == "sh600519" and int(rows[1][1]) == 1000
         finally:
             await ctx.stop()
 

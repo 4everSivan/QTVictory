@@ -24,6 +24,7 @@ from app.adapters.fallback import EastmoneyAdapter, FallbackProvider
 from app.adapters.sina import SinaAdapter
 from app.adapters.tencent import NormalizedQuote, TencentAdapter
 from app.domain.engine import BookLevel, Tick
+from app.services.watchlist import normalize_codes
 
 log = logging.getLogger("qtv.market")
 
@@ -102,7 +103,8 @@ class MarketService:
                     scope = json.loads(plan["scope"] or "{}")
                 except ValueError:
                     scope = {}
-                codes.update(scope.get("codes", []))
+                # C011：计划标的池归一（存量裸码行惰性愈合后并入轮询集）
+                codes.update(normalize_codes(scope.get("codes", []))[0])
         return sorted(codes)
 
     # -- 轮询与降级链（T06-1/T06-3，C008 扩充） ---------------------------

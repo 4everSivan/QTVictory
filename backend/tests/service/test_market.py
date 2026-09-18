@@ -1,6 +1,7 @@
 """T06：腾讯解析 / ΔV 差分 / 降级状态 / 分钟累积 / 交易日历推定。"""
 
 import asyncio
+import json
 
 from app.adapters.sina import parse_sina_payload
 from app.adapters.tencent import NormalizedQuote, TencentAdapter, parse_quote_payload
@@ -306,7 +307,7 @@ class TestMarketRuntime:
             await inject(ctx, quote(ts="09:31:00"), quote(cum=1_100_000, ts="09:31:30"))
             n = ctx.market.persist_minutes("2026-09-16")
             assert n >= 1
-            rows = ctx.store.minutes_for("600519", "2026-09-16")
+            rows = ctx.store.minutes_for("sh600519", "2026-09-16")
             assert any(r["minute"] == "09:31" for r in rows)
         finally:
             await ctx.stop()
@@ -332,11 +333,11 @@ class TestMarketRuntime:
             await ctx.traders.create({"name": "t", "mode": "manual", "initCash": 100000})
             await inject(ctx, quote())
             await ctx.trading.submit_order(1, {
-                "side": "buy", "type": "limit", "code": "600519",
+                "side": "buy", "type": "limit", "code": "sh600519",
                 "price": 10.0, "qty": 100,
             })
             await inject(ctx, quote())
-            assert "600519" in ctx.market.watchlist()  # 持仓并入关注集
+            assert "sh600519" in ctx.market.watchlist()  # 持仓并入关注集
         finally:
             await ctx.stop()
 

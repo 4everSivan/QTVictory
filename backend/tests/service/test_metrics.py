@@ -53,7 +53,7 @@ async def test_close_snapshots_and_leaderboard():
         tid = t["id"]
         await inject(ctx, quote())
         await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "market", "code": "600519", "qty": 1000,
+            "side": "buy", "type": "market", "code": "sh600519", "qty": 1000,
         })
         await inject(ctx, quote())
         n = ctx.metrics.close_snapshots("2026-09-16")

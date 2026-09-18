@@ -186,21 +186,22 @@ class TestWatchSetUnion:
             await ctx.traders.create({"name": "p", "mode": "manual", "initCash": 100000})
             await ctx.plans.create_plan({"traderId": 2, "name": "p",
                                          "scope": {"codes": ["300750"]}})
-            await inject(ctx, quote())
+            await inject(ctx, quote(code="600519"))
             await ctx.trading.submit_order(1, {
-                "side": "buy", "type": "limit", "code": "600519",
+                "side": "buy", "type": "limit", "code": "600519",  # 裸码持仓（历史行形态）
                 "price": 10.0, "qty": 100,
             })
-            await inject(ctx, quote())
+            await inject(ctx, quote(code="600519"))  # 裸码 tick 与订单匹配成交
             await ctx.watchlist.add("600519")
             await ctx.watchlist.add("300750")
             watch = ctx.market.watchlist()
-            assert {"sh600519", "sz300750", "600519", "300750"} <= set(watch)
+            assert {"sh600519", "sz300750", "600519"} <= set(watch)
             await ctx.watchlist.remove("sh600519")
             await ctx.watchlist.remove("sz300750")
             watch = ctx.market.watchlist()
-            assert "sh600519" not in watch and "sz300750" not in watch
-            assert "600519" in watch and "300750" in watch  # 持仓/计划引用保留
+            assert "sh600519" not in watch  # 自选行已删
+            assert "sz300750" in watch       # 计划引用保留（C011 归一码）
+            assert "600519" in watch         # 裸码持仓引用保留
         finally:
             await ctx.stop()
 

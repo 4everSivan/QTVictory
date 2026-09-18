@@ -68,7 +68,7 @@ async def test_capital_injection_and_reset():
         # 建仓后重置：回初始资金，净值断点保留
         await inject(ctx, quote())
         await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "market", "code": "600519", "qty": 100,
+            "side": "buy", "type": "market", "code": "sh600519", "qty": 100,
         })
         await inject(ctx, quote())
         assert ctx.store.positions_for_trader(tid)
@@ -88,7 +88,7 @@ async def test_account_view_positions():
         tid = t["id"]
         await inject(ctx, quote())
         await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "market", "code": "600519", "qty": 1000,
+            "side": "buy", "type": "market", "code": "sh600519", "qty": 1000,
         })
         await inject(ctx, quote())
         account = ctx.traders.account_view(tid)

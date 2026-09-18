@@ -21,6 +21,7 @@ from app.domain.plan_engine import (
 )
 from app.domain.strategies import run_template
 from app.errors import BizError
+from app.services.watchlist import normalize_codes
 
 TRIGGERS = ("price_cross", "pct_change", "time", "ma_cross")
 
@@ -47,10 +48,17 @@ class PlanService:
         trader_id = int(spec.get("traderId", 0))
         if store.get_trader(trader_id) is None:
             raise BizError("TRADER_NOT_FOUND", f"交易员 {trader_id} 不存在", None, 404)
-        scope = spec.get("scope") or {"codes": []}
+        scope = dict(spec.get("scope") or {"codes": []})
         codes = scope.get("codes", [])
         if not codes:
             raise BizError("BAD_REQUEST", "计划标的池不能为空", None, 422)
+        # C011：标的码归一落库（裸码静默落空修复）——裸 6 位按板块规则推导
+        # 主市场前缀，非法码显式 422 拒绝；保序去重
+        normalized, invalid = normalize_codes([str(c) for c in codes])
+        if invalid:
+            raise BizError("BAD_CODE", f"标的码格式非法：{', '.join(invalid)}",
+                           {"codes": invalid, "reason": "BAD_FORMAT"}, 422)
+        scope["codes"] = normalized
         plan_id = store.insert_plan(
             trader_id, str(spec.get("name", "计划")),
             json.dumps(scope),
@@ -69,9 +77,12 @@ class PlanService:
             except ValueError:
                 return {}
 
+        view_scope = loads(plan["scope"])
+        # C011：读取边界归一——存量裸码行惰性愈合，视图回显规范码
+        view_scope["codes"] = normalize_codes(view_scope.get("codes", []))[0]
         return {
             "id": plan["id"], "traderId": plan["trader_id"], "name": plan["name"],
-            "status": plan["status"], "scope": loads(plan["scope"]),
+            "status": plan["status"], "scope": view_scope,
             "budget": loads(plan["budget"]), "positionRule": loads(plan["position_rule"]),
             "risk": loads(plan["risk"]), "schedule": loads(plan["schedule"]),
             "createdAt": plan["created_at"],
@@ -207,7 +218,9 @@ class PlanService:
                 plan = store.get_plan(entry["plan_id"])
                 plan_cache[entry["plan_id"]] = plan
                 scope_cache[entry["plan_id"]] = (
-                    json.loads(plan["scope"] or "{}").get("codes", []) if plan else []
+                    # C011：裸行读取边界归一（存量裸码计划惰性愈合）
+                    normalize_codes(json.loads(plan["scope"] or "{}").get("codes", []))[0]
+                    if plan else []
                 )
             if plan is None or plan["status"] != "active":
                 continue

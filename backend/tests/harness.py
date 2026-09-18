@@ -19,7 +19,7 @@ def make_app(clock_start: str = "2026-09-16T09:30:00", **settings_overrides):
     return app, app.state.ctx
 
 
-def quote(code="600519", last=10.0, prev=10.0, cum=None, *,
+def quote(code="sh600519", last=10.0, prev=10.0, cum=None, *,
           bid_p=9.99, ask_p=10.00, vol=30000, ts="09:30:00", name="测试标的"):
     """默认 cum_volume 自动递增：连续注入天然形成正的周期增量 ΔV。"""
     global _CUM_SEQ

@@ -32,7 +32,7 @@ class TestValidationChain:
         await inject(ctx, quote())
         with pytest.raises(BizError) as ei:
             await ctx.trading.submit_order(tid, {
-                "side": "buy", "type": "limit", "code": "600519",
+                "side": "buy", "type": "limit", "code": "sh600519",
                 "price": 10.0, "qty": 150,
             })
         assert ei.value.code == "LOT_SIZE"
@@ -42,7 +42,7 @@ class TestValidationChain:
         await inject(ctx, quote())  # 卖一 10.00 → 买上限 10.20
         with pytest.raises(BizError) as ei:
             await ctx.trading.submit_order(tid, {
-                "side": "buy", "type": "limit", "code": "600519",
+                "side": "buy", "type": "limit", "code": "sh600519",
                 "price": 10.21, "qty": 100,
             })
         assert ei.value.code == "PRICE_BAND"
@@ -54,7 +54,7 @@ class TestValidationChain:
         await inject(ctx, quote())
         with pytest.raises(BizError) as ei:
             await ctx.trading.submit_order(tid, {
-                "side": "buy", "type": "limit", "code": "600519",
+                "side": "buy", "type": "limit", "code": "sh600519",
                 "price": 10.0, "qty": 1000,  # 需 10020 > 5000
             })
         assert ei.value.code == "INSUFFICIENT_FUNDS"
@@ -63,13 +63,13 @@ class TestValidationChain:
         tid = await _mk_trader(ctx)
         await inject(ctx, quote())
         await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "market", "code": "600519", "qty": 1000,
+            "side": "buy", "type": "market", "code": "sh600519", "qty": 1000,
         })
         await inject(ctx, quote())
-        assert ctx.store.get_position(tid, "600519")["today_bought"] == 1000
+        assert ctx.store.get_position(tid, "sh600519")["today_bought"] == 1000
         with pytest.raises(BizError) as ei:
             await ctx.trading.submit_order(tid, {
-                "side": "sell", "type": "market", "code": "600519", "qty": 200,
+                "side": "sell", "type": "market", "code": "sh600519", "qty": 200,
             })
         assert ei.value.code == "T1_LOCKED"
 
@@ -79,7 +79,7 @@ class TestValidationChain:
         ctx.clock.set(__import__("datetime").datetime.fromisoformat("2026-09-16T15:30:00"))
         with pytest.raises(BizError) as ei:
             await ctx.trading.submit_order(tid, {
-                "side": "buy", "type": "limit", "code": "600519",
+                "side": "buy", "type": "limit", "code": "sh600519",
                 "price": 10.0, "qty": 100,
             })
         assert ei.value.code == "SESSION_CLOSED"
@@ -90,7 +90,7 @@ class TestValidationChain:
         ctx.clock.advance(seconds=31)
         with pytest.raises(BizError) as ei:
             await ctx.trading.submit_order(tid, {
-                "side": "buy", "type": "market", "code": "600519", "qty": 100,
+                "side": "buy", "type": "market", "code": "sh600519", "qty": 100,
             })
         assert ei.value.code == "STALE_QUOTE"
 
@@ -99,7 +99,7 @@ class TestValidationChain:
         await inject(ctx, quote(last=0.0))
         with pytest.raises(BizError) as ei:
             await ctx.trading.submit_order(tid, {
-                "side": "buy", "type": "limit", "code": "600519",
+                "side": "buy", "type": "limit", "code": "sh600519",
                 "price": 10.0, "qty": 100,
             })
         assert ei.value.code == "SUSPENDED"
@@ -110,7 +110,7 @@ class TestValidationChain:
         await ctx.traders.patch(tid, {"status": "paused"})
         with pytest.raises(BizError) as ei:
             await ctx.trading.submit_order(tid, {
-                "side": "buy", "type": "limit", "code": "600519",
+                "side": "buy", "type": "limit", "code": "sh600519",
                 "price": 10.0, "qty": 100,
             })
         assert ei.value.code == "TRADER_CLOSED"
@@ -118,7 +118,7 @@ class TestValidationChain:
     async def test_client_order_id_idempotent(self, ctx):
         tid = await _mk_trader(ctx)
         await inject(ctx, quote())
-        payload = {"side": "buy", "type": "limit", "code": "600519",
+        payload = {"side": "buy", "type": "limit", "code": "sh600519",
                    "price": 10.0, "qty": 100, "clientOrderId": "ext-0001"}
         o1 = await ctx.trading.submit_order(tid, payload)
         o2 = await ctx.trading.submit_order(tid, dict(payload, price=10.0))
@@ -139,7 +139,7 @@ class TestMatchingIntegration:
 
         await inject(ctx, book_quote(1_000_000))
         order = await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "market", "code": "600519", "qty": 700,
+            "side": "buy", "type": "market", "code": "sh600519", "qty": 700,
         })
         await inject(ctx, book_quote(2_000_000))
         order = ctx.store.get_order(order["id"])
@@ -147,7 +147,7 @@ class TestMatchingIntegration:
         assert abs(order["avg_filled_price"] - 7005.0 / 700) < 0.0001
         trades = ctx.store.trades_for_order(order["id"])
         assert [t["qty"] for t in trades] == [300, 300, 100]  # 一单多笔
-        pos = ctx.store.get_position(tid, "600519")
+        pos = ctx.store.get_position(tid, "sh600519")
         assert pos["qty"] == 700 and pos["today_bought"] == 700
         # 移动加权成本含费用：成交额 7005 + 三笔费用（5.3+5.3+5.1）
         fees = sum(t["commission"] + t["stamp_tax"] + t["transfer_fee"] for t in trades)
@@ -159,7 +159,7 @@ class TestMatchingIntegration:
         tid = await _mk_trader(ctx, cash=1_000_000)
         await inject(ctx, quote(cum=100_000))  # 基线
         order = await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "limit", "code": "600519",
+            "side": "buy", "type": "limit", "code": "sh600519",
             "price": 10.0, "qty": 50000,
         })
         await inject(ctx, quote(cum=200_000))  # ΔV=100000 → cap 25000
@@ -175,7 +175,7 @@ class TestMatchingIntegration:
         tid = await _mk_trader(ctx)
         await inject(ctx, quote())
         await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "market", "code": "600519", "qty": 1000,
+            "side": "buy", "type": "market", "code": "sh600519", "qty": 1000,
         })
         await inject(ctx, quote())
         buy_fee = 5.0 + 10000 * 0.0001  # 佣金 5 + 过户 1
@@ -185,7 +185,7 @@ class TestMatchingIntegration:
         await inject(ctx, quote(last=11.0, cum=3_000_000))
         ctx.store.t1_reset_all()
         await ctx.trading.submit_order(tid, {
-            "side": "sell", "type": "limit", "code": "600519", "price": 11.0, "qty": 1000,
+            "side": "sell", "type": "limit", "code": "sh600519", "price": 11.0, "qty": 1000,
         })
         await inject(ctx, quote(last=11.0, cum=3_010_000))
         trades = [t for t in ctx.store.trades_feed(tid) if t["side"] == "sell"]
@@ -199,14 +199,14 @@ class TestMatchingIntegration:
         t2 = await _mk_trader(ctx)
         await inject(ctx, quote(cum=1000))  # 基线
         await ctx.trading.submit_order(t1, {
-            "side": "buy", "type": "limit", "code": "600519", "price": 10.0, "qty": 200,
+            "side": "buy", "type": "limit", "code": "sh600519", "price": 10.0, "qty": 200,
         })
         await ctx.trading.submit_order(t2, {
-            "side": "buy", "type": "limit", "code": "600519", "price": 10.0, "qty": 200,
+            "side": "buy", "type": "limit", "code": "sh600519", "price": 10.0, "qty": 200,
         })
         await inject(ctx, quote(cum=2000))  # ΔV=1000 → cap 250
-        p1 = ctx.store.get_position(t1, "600519")
-        p2 = ctx.store.get_position(t2, "600519")
+        p1 = ctx.store.get_position(t1, "sh600519")
+        p2 = ctx.store.get_position(t2, "sh600519")
         assert p1["qty"] == 200          # 先到先得
         assert p2["qty"] == 50           # 剩余额度
         assert p1["qty"] + p2["qty"] == 250  # 合计 ≤ ΔV×25%
@@ -217,7 +217,7 @@ class TestCancelAndAuction:
         tid = await _mk_trader(ctx)
         await inject(ctx, quote())
         order = await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "limit", "code": "600519",
+            "side": "buy", "type": "limit", "code": "sh600519",
             "price": 9.95, "qty": 1000,  # 不穿越 → wait
         })
         assert ctx.traders.account_view(tid)["availableCash"] == pytest.approx(
@@ -232,7 +232,7 @@ class TestCancelAndAuction:
         await inject(ctx, quote(), now=__import__("datetime").datetime.fromisoformat(
             "2026-09-16T09:16:00"))
         order = await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "limit", "code": "600519", "price": 9.95, "qty": 100,
+            "side": "buy", "type": "limit", "code": "sh600519", "price": 9.95, "qty": 100,
         })
         ctx.clock.set(__import__("datetime").datetime.fromisoformat("2026-09-16T09:21:00"))
         with pytest.raises(BizError) as ei:
@@ -245,9 +245,9 @@ class TestCancelAndAuction:
         await inject(ctx, quote(), now=__import__("datetime").datetime.fromisoformat(
             "2026-09-16T09:16:00"))
         order = await ctx.trading.submit_order(tid, {
-            "side": "buy", "type": "limit", "code": "600519", "price": 10.00, "qty": 100,
+            "side": "buy", "type": "limit", "code": "sh600519", "price": 10.00, "qty": 100,
         })
-        ctx.trading.settle_auction("600519", auction_price=9.90, auction_volume=100000)
+        ctx.trading.settle_auction("sh600519", auction_price=9.90, auction_volume=100000)
         order = ctx.store.get_order(order["id"])
         assert order["status"] == "filled" and order["avg_filled_price"] == 9.90
-        assert ctx.store.get_position(tid, "600519")["qty"] == 100
+        assert ctx.store.get_position(tid, "sh600519")["qty"] == 100
