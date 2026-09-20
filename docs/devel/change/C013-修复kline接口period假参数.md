@@ -48,5 +48,5 @@ BG-0007（FT-0009 后端设计起草时发现，Phase 1 遗留）：`GET /market
 - **结论**：核验通过
 - **会话确认记录**：2026-09-20 收口会话中人工确认，同意合入。AI 汇报核验事实——后端 pytest 204 项全绿、前端 Vitest 155 项全绿；8788 实例实测复验（2026-09-20）：`period=minute` → 400 `BAD_REQUEST`（message 指引分时走 `/market/minute`），`period=day` 行为不变（末根 2026-09-18 完结 bar，close 1257.12）。
 - **版本归档**：
-  - 关联提交：（合入后回填）
+  - 关联提交：`[4bcd769](https://github.com/4everSivan/QTVictory/commit/4bcd769)`
   - 纳入版本：`[v0.1.0](../../../CHANGELOG.md)`（待发布行）

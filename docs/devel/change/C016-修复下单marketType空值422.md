@@ -51,5 +51,5 @@
 - **结论**：核验通过
 - **会话确认记录**：2026-09-20 收口会话中人工确认（用户实测 UI 买入限价/市价均成功），同意合入。AI 汇报核验事实——后端 pytest 204 项全绿（含 test_order_market_type_nullable_contract）、前端 Vitest 155 项全绿 + tsc/Vite 构建零报错；8788 实例 API 实测（2026-09-20）：限价单显式 `marketType: null` → 201 且不落类型，市价单缺省 → 201 且归一落库 `best5_cancel`，实测现场已清理。
 - **版本归档**：
-  - 关联提交：（合入后回填）
+  - 关联提交：`[4bcd769](https://github.com/4everSivan/QTVictory/commit/4bcd769)`
   - 纳入版本：`[v0.1.0](../../../CHANGELOG.md)`（待发布行）
