@@ -76,7 +76,8 @@ docs/devel/
 
 ```
 【登记层】  缺陷 / 微调 / 复验 ──► todo/now.md 表格登记
-           功能 / 债务       ──► todo/future.md 表格登记
+           功能（当前版本立项） ──► todo/now.md §3 登记
+           功能（后续版本） / 债务 ──► todo/future.md 表格登记
                   （落地即移出 · 零沉淀 · 编号只增）
 
 【缺陷修复链路】 Bug / 功能回调 / 参数微调
@@ -90,7 +91,7 @@ docs/devel/
                                  └─► 回写闭环：design 三处回写 + CHANGELOG 互链 + git tag
 
 【功能设计链路】 新功能 / 新 Phase 立项
-  future.md 登记方向
+  future.md（后续版本）或 now.md §3（当前版本）登记方向
    └─► design/ 新增或修订章节（讨论中 → 现行基线）  ★ 完成设计即从 todo 移除
         └─► plan/ 建 M 卡 + task/ 建 T 卡（编号只增，Phase 2 起）
              └─► 按 T 卡 DoD 开发
