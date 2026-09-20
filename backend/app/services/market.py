@@ -25,7 +25,7 @@ from typing import Any
 from app.adapters.fallback import EastmoneyAdapter, FallbackProvider
 from app.adapters.sina import SinaAdapter
 from app.adapters.tencent import NormalizedQuote, TencentAdapter
-from app.domain.engine import BookLevel, Tick
+from app.domain.engine import BookLevel, Tick, board_code
 from app.services.watchlist import normalize_codes
 
 log = logging.getLogger("qtv.market")
@@ -33,6 +33,64 @@ log = logging.getLogger("qtv.market")
 INDEX_CODES = ["sh000300"]
 
 _SUGGEST_TTL_SEC = 30.0  # 联想结果服务端短缓存（§3.10）
+
+_KLINE_DEPTH_FALLBACK = 320  # 单源拉取失败的深度回落（ifzq qfq 实测封顶约束，Q11）
+
+
+def _to_lots(code: str, shares: int) -> int:
+    """快照累计量（股）→ 日K volume（手）：688 原值为股直通，其余 ÷100。
+    与 tencent._to_shares 互为逆运算——量纲锚定（T25-6/护栏③）。"""
+    return int(shares) if board_code(code).startswith("688") else int(shares) // 100
+
+
+def kline_view(cold: list[dict[str, Any]], hot: NormalizedQuote | None,
+               hot_date: str) -> list[dict[str, Any]]:
+    """冷热合成视图（02 §3.11 Q12）：klines 完结冷序列 ∪ 当日热 bar（交易日未完结时）。
+    降级档缺当日 OHLC、停牌、或当日完结 bar 已入库时热 bar 缺席——
+    诚实少最后一根，不造假 bar。展示/API 读本视图；触发域读纯冷序列。"""
+    bars = [dict(r) for r in cold]
+    if hot is None or hot.last <= 0 or not hot_date:
+        return bars
+    if bars and bars[-1]["date"] >= hot_date:
+        return bars
+    if hot.open <= 0 or hot.high <= 0 or hot.low <= 0:
+        return bars
+    bars.append({
+        "code": hot.code,
+        "date": hot_date,
+        "open": hot.open,
+        "close": hot.last,
+        "high": max(hot.high, hot.last),
+        "low": min(hot.low, hot.last),
+        "volume": _to_lots(hot.code, hot.cum_volume),
+    })
+    return bars
+
+
+def aggregate_bars(bars: list[dict[str, Any]], period: str) -> list[dict[str, Any]]:
+    """week/month 纯函数聚合（02 §3.11 T26）：week 按 ISO 自然周（周一界）、
+    month 按自然月切分；period 内首日 open、末日 close、max high、min low、
+    sum volume；`date` 取该 period 内最后交易日（主流行情软件口径）。
+    不落表不缓存（单码 ≤800 行 O(n)）。day 原样透传。"""
+    if period == "day":
+        return [dict(b) for b in bars]
+    buckets: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for b in bars:
+        d = date_cls.fromisoformat(b["date"])
+        key = ((d - timedelta(days=d.weekday())).isoformat() if period == "week"
+               else d.replace(day=1).isoformat())
+        agg = buckets.get(key)
+        if agg is None:
+            buckets[key] = dict(b)
+            order.append(key)
+            continue
+        agg["close"] = b["close"]
+        agg["date"] = b["date"]
+        agg["high"] = max(agg["high"], b["high"])
+        agg["low"] = min(agg["low"], b["low"])
+        agg["volume"] += b["volume"]
+    return [buckets[k] for k in order]
 
 
 class MarketService:
@@ -189,6 +247,11 @@ class MarketService:
         degraded = self.source not in ("tencent", "sina")
         ticks: list[Tick] = []
         for q in quotes:
+            prev_date = self._last_cum_date.get(q.code, "")
+            prev_snap = self.snapshots.get(q.code)
+            if prev_date and prev_date != today and prev_snap is not None:
+                # T25-3：换日捕获自沉淀——新日数据覆盖之前，完结热 bar 落库
+                self._capture_hot_bar(prev_snap, prev_date)
             prev_cum = self._last_cum.get(q.code, 0)
             if self._last_cum_date.get(q.code, "") != today:
                 prev_cum = 0  # 新交易日：累计量重置
@@ -236,6 +299,26 @@ class MarketService:
             self._minute_dirty = True   # 进入新分钟桶：触发增量刷盘（C012）
         price, _ = self._minute_bars.get(key, (q.last, 0))
         self._minute_bars[key] = (price, q.cum_volume)
+
+    def _capture_hot_bar(self, q: NormalizedQuote, date: str) -> None:
+        """换日捕获自沉淀（T25-3，02 §3.11 冷热双态）：日切前完结热 bar 落库，
+        与 C012 分钟自沉淀同构对称。源门禁：tencent/sina（live 完整档）必落；
+        eastmoney（真实价但字段可能不全）视 OHLC 有效性；anchor 恒不落
+        （人造价格禁止入冷序列）。幂等 upsert；该日完结 bar 已在库
+        （上游权威）时不覆盖；崩溃于捕获与 checkpoint 之间可重跑。"""
+        if self.source == "anchor":
+            return
+        if self.source not in ("tencent", "sina") and not (
+                q.open > 0 and q.high > 0 and q.low > 0):
+            return
+        if q.last <= 0 or q.cum_volume <= 0:
+            return
+        cold = self.ctx.store.klines_for(q.code, limit=1)
+        if cold and cold[-1]["date"] >= date:
+            return
+        row = (q.code, date, q.open, q.last, max(q.high, q.last),
+               min(q.low, q.last), _to_lots(q.code, q.cum_volume))
+        self.ctx.store.upsert_klines([row])
 
     def _schedule_minute_flush(self) -> None:
         task = asyncio.create_task(self._flush_minutes_task(), name="minute-flush")
@@ -305,6 +388,25 @@ class MarketService:
         close = self.ctx.store.klines_for(code, limit=1)
         return close[-1]["close"] if close else 0.0
 
+    def kline_view_for(self, code: str, limit: int = 250) -> list[dict[str, Any]]:
+        """展示/API 读路径（02 §3.11 双读者）：klines 完结冷序列 ∪ 当日热 bar。
+        触发域（price()/PlanEngine 收盘口径）仍读纯冷序列，语义零变化。"""
+        cold = self.ctx.store.klines_for(code, limit=limit)
+        return kline_view(cold, self.snapshots.get(code),
+                          self._last_cum_date.get(code, ""))
+
+    def kline_series(self, code: str, period: str = "day",
+                     limit: int = 250) -> list[dict[str, Any]]:
+        """多周期 API 读路径（T26）：day = 冷热合成原样；week/month = 聚合后
+        截尾 limit 根（limit 语义 = 聚合后根数；取数按周期换算 + 缓冲——
+        week 5N+10、month 22N+22，封顶 5000 防失控）。"""
+        if period == "day":
+            return self.kline_view_for(code, limit=limit)
+        per = 5 if period == "week" else 22
+        fetch = min(limit * per + 10, 5000)
+        bars = aggregate_bars(self.kline_view_for(code, limit=fetch), period)
+        return bars[-limit:]
+
     def quotes_payload(self) -> dict[str, Any]:
         return {
             "source": self.source, "live": self.live,
@@ -334,14 +436,24 @@ class MarketService:
 
     # -- K 线 / 分钟线 / 公司行动 ------------------------------------------
 
-    async def _fetch_daily_chain(self, code: str) -> list[tuple]:
-        """日K 链路：腾讯 ifzq → 东财 push2his 兜底（C008 同款，量纲一致）。"""
+    def _kline_depth_for(self, code: str) -> int:
+        """校准重拉深度（T25-4）：max(配置深度, 库存深度)——重拉深度 ≥ 库存深度，
+        防旧自沉淀 bar 与重锚后序列错位（02 §3.11 复权口径）。"""
+        return max(self.ctx.settings.qtv_kline_depth,
+                   self.ctx.store.klines_depth(code))
+
+    async def _fetch_daily_chain(self, code: str, depth: int | None = None) -> list[tuple]:
+        """日K 链路：腾讯 ifzq → 东财 push2his 兜底（C008 同款，量纲一致）。
+        T25-5：深度经 `QTV_KLINE_DEPTH`（默认 800、上限 800——ifzq qfq 实测
+        封顶约 640~800，Q11）；单源失败回落 320 不阻断引导链。"""
+        if depth is None:
+            depth = self._kline_depth_for(code)
         try:
-            return await self._tencent.fetch_daily_klines(code)
+            return await self._tencent.fetch_daily_klines(code, depth)
         except Exception:
             if self._eastmoney is None:
                 raise
-            return await self._eastmoney.fetch_daily_klines(code)
+            return await self._eastmoney.fetch_daily_klines(code, _KLINE_DEPTH_FALLBACK)
 
     async def _bootstrap_klines(self) -> None:
         try:

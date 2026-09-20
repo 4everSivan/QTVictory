@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     )
     qtv_dividend_tax: float = Field(default=0.10, ge=0, le=1, description="现金分红统一税率")
     qtv_max_traders: int = Field(default=64, ge=1, description="交易员数量上限")
+    qtv_kline_depth: int = Field(
+        default=800, ge=1, le=800,
+        description="日K引导/校准重拉深度（根数，上限 800——ifzq 实测封顶；单源失败回落 320）"
+    )
     qtv_cors: str = Field(default="http://localhost:4312", description="允许来源")
 
     @field_validator("qtv_port")

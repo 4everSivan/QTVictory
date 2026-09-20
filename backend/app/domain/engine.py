@@ -77,10 +77,11 @@ class MatchOutcome:
 
 
 def calc_fee(amount: float, is_buy: bool) -> Fee:
-    """费用公式（v1 §6 表）：佣金 max(amt×0.00025, 5)；印花税卖出 0.0005；过户费 0.0001。"""
+    """费用公式（v1 §6 表，过户费按 C020 对齐中证登 2022-04-29 起现行口径）：
+    佣金 max(amt×0.00025, 5)；印花税卖出 0.0005；过户费 0.00001（十万分之一，双向收取）。"""
     commission = round(max(amount * 0.00025, 5.0), 2)
     stamp = 0.0 if is_buy else round(amount * 0.0005, 2)
-    transfer = round(amount * 0.0001, 2)
+    transfer = round(amount * 0.00001, 2)
     return Fee(commission=commission, stamp_tax=stamp, transfer_fee=transfer)
 
 

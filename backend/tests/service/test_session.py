@@ -68,19 +68,19 @@ class TestDayCut:
             assert steps["advance_date"] == "2026-09-17"
 
             trader = ctx.store.get_trader(tid)
-            # 分红：1000 × 0.50 × (1−10%) = 450
+            # 分红：1000 × 0.50 × (1−10%) = 450（买入费 5+0.1：佣金保底 5 + 过户 0.01‰）
             assert trader["cash"] == pytest_approx(
-                100000 - (10000 + 6.0) + 450)
+                100000 - (10000 + 5.1) + 450)
             # 送转：1000 × (1 + 0.1 + 0.5) = 1600 股，成本摊薄
             pos = ctx.store.get_position(tid, "sh600519")
             assert pos["qty"] == 1600
-            assert pos["avg_cost"] == pytest_approx((10000 + 6.0) / 1600)
+            assert pos["avg_cost"] == pytest_approx((10000 + 5.1) / 1600)
             # T+1 重置 + 到账股份不占 today_bought（除权日即可卖）
             assert pos["today_bought"] == 0
             # 快照 = 除权前口径（§6.4：收盘快照先于公司行动）
             snap = ctx.store.snapshots_for_trader(tid)[-1]
             assert snap["total_equity"] == pytest_approx(
-                100000 - (10000 + 6.0) + 1000 * 10)
+                100000 - (10000 + 5.1) + 1000 * 10)
             # 事件留痕
             actions = [e["action"] for e in ctx.store.events_feed()]
             assert "dividend" in actions and "transfer" in actions
@@ -131,7 +131,7 @@ class TestDayCut:
             tid = await _seed_day(ctx)
             await ctx.session.day_cut("2026-09-16")
             trader = ctx.store.get_trader(tid)
-            assert trader["cash"] == pytest_approx(100000 - (10000 + 6.0) + 1000 * 0.50)
+            assert trader["cash"] == pytest_approx(100000 - (10000 + 5.1) + 1000 * 0.50)
         finally:
             await ctx.stop()
 

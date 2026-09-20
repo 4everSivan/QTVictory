@@ -29,13 +29,13 @@ async def market_kline(
     limit: int = Query(250, ge=1, le=5000),
 ):
     # C013：minute 假参数移除（原校验放行但恒返回日K行）；分时统一走
-    # /market/minute，week/month 待 §3.11 多周期落地后放行
-    if period != "day":
+    # /market/minute。T26：week/month 聚合内核落地，枚举放行 day|week|month
+    if period not in ("day", "week", "month"):
         raise BizError(
             "BAD_REQUEST",
-            "period 当前仅支持 day；分时数据请用 /market/minute", None, 400)
+            "period 仅支持 day/week/month；分时数据请用 /market/minute", None, 400)
     ctx = request.app.state.ctx
-    rows = await asyncio.to_thread(ctx.store.klines_for, code, limit)
+    rows = await asyncio.to_thread(ctx.market.kline_series, code, period, limit)
     return {"code": code, "period": period, "data": rows}
 
 

@@ -80,3 +80,40 @@
   flex-direction: column;
   gap: 2px;
 }
+
+/* T27-2/3：副图胶丸（副图右上、半透明底）与主图叠加胶丸（顶栏第二胶丸组）——01 §5.5 D2/D4 */
+.kline-pills {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 2px;
+  z-index: 2;
+}
+
+.kline-pills .pill {
+  border: none;
+  background: none;
+  color: var(--txt2);
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.kline-pills .pill.active {
+  background: var(--line2);
+  color: var(--txt);
+}
+
+.kline-pills-sub {
+  right: 64px;
+  top: calc(26px + (100% - 42px) * 0.78 * 0.78);
+}
+
+.kline-pills-overlay {
+  right: 64px;
+  top: 4px;
+}

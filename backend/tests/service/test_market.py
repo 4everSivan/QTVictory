@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from datetime import datetime
 
 from app.adapters.sina import parse_sina_payload
 from app.adapters.tencent import (
@@ -10,6 +11,7 @@ from app.adapters.tencent import (
     parse_latest_minutes_payload,
     parse_quote_payload,
 )
+from app.services.market import _to_lots, aggregate_bars, kline_view
 from tests.harness import inject, make_app, quote
 
 
@@ -555,3 +557,265 @@ class TestLatestMinutesParse:
         assert parse_latest_minutes_payload("sh600519", {"data": {}}) is None
         assert parse_latest_minutes_payload(
             "sh600519", {"data": {"sh600519": {"data": {"date": "bad", "data": []}}}}) is None
+
+
+class TestColdHotBars:
+    """T25：冷热双态 bar 模型（02 §3.11 Q12 决议）——冷热四护栏。"""
+
+    @staticmethod
+    def _cold(code, dates):
+        return [
+            {"code": code, "date": d, "open": 10.0, "close": 10.0,
+             "high": 10.0, "low": 10.0, "volume": 100_000}
+            for d in dates
+        ]
+
+    class _FakeKlineAdapter:
+        def __init__(self, rows):
+            self.rows = rows
+            self.limits: list[int] = []
+
+        async def fetch_daily_klines(self, code, limit=320):
+            self.limits.append(limit)
+            return self.rows
+
+    class _DeadKline:
+        async def fetch_daily_klines(self, code, limit=320):
+            raise RuntimeError("kline source dead")
+
+    # -- 护栏①：kline_view 冷热合成纯函数 -------------------------------
+
+    def test_view_appends_hot_bar_when_day_open(self):
+        bars = kline_view(
+            self._cold("sh600519", ["2026-09-15"]),
+            quote("sh600519", last=10.8, prev=10.5, cum=300_000),
+            "2026-09-16",
+        )
+        assert len(bars) == 2
+        hot = bars[-1]
+        assert hot["date"] == "2026-09-16" and hot["close"] == 10.8
+        assert hot["volume"] == 3_000          # 30 万股 → 3000 手（手/股口径锚定）
+
+    def test_view_absent_when_degraded_missing_ohlc(self):
+        degraded = NormalizedQuote(
+            code="sh600519", name="降级档", last=10.5, prev_close=10.0,
+            open=0.0, high=0.0, low=0.0, cum_volume=500_000,
+        )
+        assert len(kline_view(
+            self._cold("sh600519", ["2026-09-15"]), degraded, "2026-09-16")) == 1
+
+    def test_view_absent_when_suspended(self):
+        assert len(kline_view(
+            self._cold("sh600519", ["2026-09-15"]),
+            quote("sh600519", last=0.0, cum=500_000), "2026-09-16")) == 1
+
+    def test_view_no_dup_when_cold_already_has_date(self):
+        # 完结 bar 已入库（冷序列末根 >= 热日）→ 不合成，触发域口径零变化
+        assert len(kline_view(
+            self._cold("sh600519", ["2026-09-15", "2026-09-16"]),
+            quote("sh600519", last=10.8, cum=300_000), "2026-09-16")) == 2
+
+    # -- 护栏②：换日捕获源门禁 -------------------------------------------
+
+    async def test_capture_completed_hot_bar_on_day_change(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            ctx.market.sync_klines(
+                [("sh600519", d, 10.0, 10.0, 10.0, 10.0, 100_000)
+                 for d in ("2026-09-14", "2026-09-15")])
+            await inject(ctx, quote("sh600519", last=10.5, cum=1_050_000),
+                         now=datetime(2026, 9, 16, 15, 0, 0))
+            assert len(ctx.store.klines_for("sh600519", limit=10)) == 2  # 当日未完结不落
+            await inject(ctx, quote("sh600519", last=10.6, cum=200_000),
+                         now=datetime(2026, 9, 17, 9, 31, 0))
+            got = ctx.store.klines_for("sh600519", limit=10)
+            assert [r["date"] for r in got][-1] == "2026-09-16"
+            assert got[-1]["close"] == 10.5 and got[-1]["volume"] == 10_500
+        finally:
+            await ctx.stop()
+
+    async def test_capture_source_gate(self):
+        for source, expect_capture in (("tencent", True), ("sina", True),
+                                       ("eastmoney", True), ("anchor", False)):
+            _, ctx = make_app()
+            await ctx.start()
+            try:
+                ctx.market.source = source
+                await inject(ctx, quote("sh600519", last=10.5, cum=1_050_000),
+                             now=datetime(2026, 9, 16, 15, 0, 0))
+                await inject(ctx, quote("sh600519", last=10.6, cum=200_000),
+                             now=datetime(2026, 9, 17, 9, 31, 0))
+                got = ctx.store.klines_for("sh600519", limit=10)
+                assert (len(got) == 1) is expect_capture, source
+            finally:
+                await ctx.stop()
+
+    async def test_capture_eastmoney_requires_valid_ohlc(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            ctx.market.source = "eastmoney"
+            partial = NormalizedQuote(
+                code="sh600519", name="东财档", last=10.5, prev_close=10.0,
+                open=0.0, high=0.0, low=0.0, cum_volume=500_000,
+            )
+            await inject(ctx, partial, now=datetime(2026, 9, 16, 15, 0, 0))
+            await inject(ctx, quote("sh600519", last=10.6, cum=200_000),
+                         now=datetime(2026, 9, 17, 9, 31, 0))
+            assert ctx.store.klines_for("sh600519", limit=10) == []
+        finally:
+            await ctx.stop()
+
+    async def test_capture_idempotent_rerun(self):
+        # 断点重入：捕获与 checkpoint 之间崩溃后幂等重跑不重复、不错位
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            await inject(ctx, quote("sh600519", last=10.5, cum=1_050_000),
+                         now=datetime(2026, 9, 16, 15, 0, 0))
+            await inject(ctx, quote("sh600519", last=10.6, cum=200_000),
+                         now=datetime(2026, 9, 17, 9, 31, 0))
+            before = ctx.store.klines_for("sh600519", limit=10)
+            await inject(ctx, quote("sh600519", last=10.7, cum=300_000),
+                         now=datetime(2026, 9, 17, 10, 31, 0))
+            assert ctx.store.klines_for("sh600519", limit=10) == before
+        finally:
+            await ctx.stop()
+
+    # -- 护栏③：量纲锚定（收盘快照 cum_volume ↔ ifzq 同日 volume） ----------
+
+    def test_volume_unit_anchor_roundtrip(self):
+        from app.adapters.tencent import _to_shares
+        for code in ("sh600519", "sz000001", "sh688981"):
+            hand = 142_000
+            assert _to_lots(code, _to_shares(code, hand)) == hand, code
+
+    async def test_captured_bar_volume_matches_ifzq_hand(self):
+        from app.adapters.tencent import _to_shares
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            await inject(ctx, quote("sh600519", last=10.5, cum=_to_shares("sh600519", 14_200)),
+                         now=datetime(2026, 9, 16, 15, 0, 0))
+            await inject(ctx, quote("sh600519", last=10.6, cum=200_000),
+                         now=datetime(2026, 9, 17, 9, 31, 0))
+            got = ctx.store.klines_for("sh600519", limit=1)
+            assert got[-1]["volume"] == 14_200
+        finally:
+            await ctx.stop()
+
+    # -- 护栏④：校准重拉深度 ≥ 库存深度 ------------------------------------
+
+    async def test_bootstrap_depth_at_least_stock(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            fake = self._FakeKlineAdapter(
+                [("sh600519", "2026-09-17", 10.0, 10.0, 10.0, 10.0, 100_000)])
+            ctx.market._tencent = fake
+            ctx.market.set_watch_override(["sh600519"])
+            ctx.market.sync_klines(
+                [("sh600519", f"2026-09-{i:02d}", 10.0, 10.0, 10.0, 10.0, 100_000)
+                 for i in range(1, 4)])
+            await ctx.market._bootstrap_klines()
+            assert fake.limits == [800, 800]    # 关注集 = sh600519 ∪ sh000300
+        finally:
+            await ctx.stop()
+
+    async def test_bootstrap_depth_covers_deeper_stock(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            fake = self._FakeKlineAdapter([])
+            ctx.market._tencent = fake
+            ctx.market.set_watch_override(["sh600519"])
+            ctx.market.sync_klines(
+                [("sh600519", f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}",
+                  10.0, 10.0, 10.0, 10.0, 100_000) for i in range(900)])
+            await ctx.market._bootstrap_klines()
+            # 关注集排序 = [sh000300, sh600519]：指数无库存 800，标的 900 根库存 → ≥ 900
+            assert max(fake.limits) >= 900
+        finally:
+            await ctx.stop()
+
+    async def test_chain_falls_back_to_320_on_primary_failure(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            east = self._FakeKlineAdapter([])
+            ctx.market._tencent = self._DeadKline()
+            ctx.market._eastmoney = east
+            ctx.market.set_watch_override(["sh600519"])
+            await ctx.market._bootstrap_klines()
+            assert east.limits == [320, 320]
+        finally:
+            await ctx.stop()
+
+    async def test_kline_depth_config(self):
+        _, ctx = make_app(qtv_kline_depth=400)
+        await ctx.start()
+        try:
+            fake = self._FakeKlineAdapter([])
+            ctx.market._tencent = fake
+            ctx.market.set_watch_override(["sh600519"])
+            await ctx.market._bootstrap_klines()
+            assert fake.limits[0] == 400
+        finally:
+            await ctx.stop()
+
+
+class TestPeriodAggregation:
+    """T26：week/month 纯函数聚合（02 §3.11）——聚合口径与 limit 语义。"""
+
+    @staticmethod
+    def _daily(dates):
+        """dates: [(date, open, close, high, low, volume)] → klines_for 形态行。"""
+        return [
+            {"code": "sh600519", "date": d, "open": o, "close": c,
+             "high": h, "low": l, "volume": v}
+            for d, o, c, h, l, v in dates
+        ]
+
+    def test_week_iso_boundary_and_ohlcv(self):
+        # 跨年周界：2026-12-28（周一）至 2027-01-01（周五）同一自然周
+        bars = aggregate_bars(self._daily([
+            ("2026-12-25", 10, 11, 12, 9, 100),    # 上周五
+            ("2026-12-28", 11, 12, 13, 11, 200),   # 周一
+            ("2026-12-31", 12, 13, 14, 12, 300),   # 周四
+            ("2027-01-04", 13, 14, 15, 13, 400),   # 次周一
+        ]), "week")
+        assert [b["date"] for b in bars] == ["2026-12-25", "2026-12-31", "2027-01-04"]
+        w = bars[1]
+        assert (w["open"], w["close"], w["high"], w["low"], w["volume"]) == (
+            11, 13, 14, 11, 500)                   # 末日 close/末交易日 date
+
+    def test_week_holiday_short_week(self):
+        bars = aggregate_bars(self._daily([
+            ("2026-10-05", 10, 11, 12, 9, 100),    # 国庆短周（周一）
+            ("2026-10-06", 11, 12, 13, 11, 200),
+        ]), "week")
+        assert len(bars) == 1 and bars[0]["date"] == "2026-10-06"
+
+    def test_week_single_trading_day(self):
+        bars = aggregate_bars(self._daily([("2026-10-09", 10, 11, 12, 9, 100)]), "week")
+        assert len(bars) == 1 and bars[0]["volume"] == 100
+
+    def test_month_boundary(self):
+        bars = aggregate_bars(self._daily([
+            ("2026-09-30", 10, 11, 12, 9, 100),
+            ("2026-10-09", 11, 12, 13, 10, 200),
+            ("2026-10-30", 12, 13, 14, 12, 300),
+            ("2026-11-02", 13, 14, 15, 13, 400),
+        ]), "month")
+        assert [b["date"] for b in bars] == ["2026-09-30", "2026-10-30", "2026-11-02"]
+        assert bars[1]["volume"] == 500
+
+    def test_day_period_passthrough(self):
+        rows = self._daily([("2026-09-15", 10, 11, 12, 9, 100)])
+        assert aggregate_bars(rows, "day") == rows
+
+    def test_limit_applies_after_aggregation(self):
+        dates = [(f"2026-09-{d:02d}", 10, 11, 12, 9, 100) for d in range(1, 8)]
+        bars = aggregate_bars(self._daily(dates), "week")
+        assert len(bars) == 2                          # 09-01..07 两周

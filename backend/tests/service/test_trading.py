@@ -202,7 +202,7 @@ class TestMatchingIntegration:
             "side": "buy", "type": "market", "code": "sh600519", "qty": 1000,
         })
         await inject(ctx, quote())
-        buy_fee = 5.0 + 10000 * 0.0001  # 佣金 5 + 过户 1
+        buy_fee = 5.0 + 10000 * 0.00001  # 佣金 5 + 过户 0.1（0.01‰）
         avg = (10000.0 + buy_fee) / 1000
         # T+1：改交易日解锁
         ctx.clock.set(__import__("datetime").datetime.fromisoformat("2026-09-17T09:30:00"))
@@ -214,7 +214,7 @@ class TestMatchingIntegration:
         await inject(ctx, quote(last=11.0, cum=3_010_000))
         trades = [t for t in ctx.store.trades_feed(tid) if t["side"] == "sell"]
         assert trades and trades[0]["realized_pnl"] == pytest.approx(
-            (11.0 - avg) * 1000 - (5 + 11000 * 0.0005 + 11000 * 0.0001)
+            (11.0 - avg) * 1000 - (5 + 11000 * 0.0005 + 11000 * 0.00001)
         )
 
     async def test_pool_competition_arrival_order(self, ctx):

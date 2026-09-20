@@ -1,12 +1,32 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { api } from '../api/client'
 import type { KlineRow, MinuteRow, Quote } from '../api/types'
+import { lsGet, lsSet } from '../lib/storage'
 
 /**
  * 行情数据缓存（01 §9 服务端状态缓存）：kline/minute 预取与逐笔派生。
  * 逐笔：后端未单设逐笔端点，以相邻 quotes 包络的累计量差派生
  * （降级时 ΔV=0 不产生记录——见 T17 变更记录）。
  */
+
+/** K 线周期（T27-1，01 §5.5 D1）：分时走 minute 端点，其余走 /market/kline period */
+export type KlinePeriod = 'day' | 'week' | 'month'
+
+const PERIOD_STORAGE_KEY = 'qtv_kline_period'
+
+function isKlinePeriod(v: string | null): v is KlinePeriod {
+  return v === 'day' || v === 'week' || v === 'month'
+}
+
+/** 选中周期持久化（01 §5.5：ChartArea 周期 Tab 经 lib/storage 持久化） */
+export function loadKlinePeriod(): KlinePeriod {
+  const stored = lsGet(PERIOD_STORAGE_KEY)
+  return isKlinePeriod(stored) ? stored : 'day'
+}
+
+export function saveKlinePeriod(period: KlinePeriod): void {
+  lsSet(PERIOD_STORAGE_KEY, period)
+}
 
 const cache = new Map<string, unknown>()
 const listeners = new Set<() => void>()
@@ -34,8 +54,21 @@ export function useCache<T>(key: string | null): T | undefined {
   )
 }
 
-export function klineKey(code: string): string {
-  return `kline:${code}`
+/** kline 缓存键按周期分键（T27-1）：kline:{code}:{period}，day 为默认兼容态 */
+export function klineKey(code: string, period: KlinePeriod = 'day'): string {
+  return `kline:${code}:${period}`
+}
+
+/** 拉取指定周期 K 线入缓存（缺键时； ChartArea 周期切换与预取共用） */
+export function fetchKlinePeriod(code: string, period: KlinePeriod): void {
+  const key = klineKey(code, period)
+  if (cache.has(key)) return
+  api
+    .get<{ code: string; period: string; data: KlineRow[] }>(
+      `/market/kline?code=${code}&period=${period}`,
+    )
+    .then((r) => setCache(key, r.data))
+    .catch(() => setCache(key, [] as KlineRow[]))
 }
 
 export function minuteKey(code: string): string {

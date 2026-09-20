@@ -6,7 +6,9 @@ import {
   getCache,
   ingestQuotesEnvelope,
   klineKey,
+  loadKlinePeriod,
   minuteKey,
+  saveKlinePeriod,
   setCache,
   useCache,
   useTicks,
@@ -28,6 +30,19 @@ describe('行情缓存与逐笔派生（T17-4）', () => {
     expect(result.current).toEqual([{ code: '600519' }])
     act(() => setCache(klineKey('600519'), []))
     expect(result.current).toEqual([])
+  })
+
+  it('T27-1：kline 缓存键按周期分键（day 默认保持兼容）', () => {
+    expect(klineKey('600519')).toBe('kline:600519:day')
+    expect(klineKey('600519', 'week')).toBe('kline:600519:week')
+    expect(klineKey('600519', 'month')).toBe('kline:600519:month')
+  })
+
+  it('T27-1：周期选择经 storage 持久化', () => {
+    expect(loadKlinePeriod()).toBe('day')
+    saveKlinePeriod('week')
+    expect(loadKlinePeriod()).toBe('week')
+    saveKlinePeriod('day')
   })
 
   it('相邻包络累计量差派生逐笔，倒挂/重复不派生', () => {

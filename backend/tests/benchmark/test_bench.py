@@ -82,7 +82,7 @@ class TestBenchmarks:
             rows = [{
                 "order_id": 1, "trader_id": tid, "code": "600519", "side": "buy",
                 "price": 10.0, "qty": 100, "amount": 1000.0, "commission": 5.0,
-                "stamp_tax": 0.0, "transfer_fee": 0.1, "realized_pnl": None,
+                "stamp_tax": 0.0, "transfer_fee": 0.01, "realized_pnl": None,
                 "origin": "manual", "ts": now, "trading_date": "2026-09-16",
             } for _ in range(10_000)]
             t0 = time.perf_counter()

@@ -52,6 +52,126 @@ export function maSeries(values: Array<number | null>, n: number): Array<number 
   return values.map((_, i) => ma(values, n, i))
 }
 
+/* ---- 技术指标（01 §5.5 D8 口径钉死；null 语义对齐 maSeries，窗口不足 null） ---- */
+
+/** EMA（种子=首值——与 TA-Lib 的 SMA 种子差异在 golden vectors 中显式钉死，D8） */
+export function ema(values: number[], n: number): Array<number | null> {
+  const out: Array<number | null> = values.map(() => null)
+  if (n <= 0 || values.length < n) return out
+  const k = 2 / (n + 1)
+  let prev = values[0]
+  for (let i = 1; i < values.length; i += 1) {
+    prev = values[i] * k + prev * (1 - k)
+    if (i >= n - 1) out[i] = prev
+  }
+  return out
+}
+
+export interface MacdPoint {
+  dif: number | null
+  dea: number | null
+  hist: number | null
+}
+
+/** MACD(fast,slow,signal)：DIF=EMA(fast)−EMA(slow)；DEA=EMA(signal) of DIF（种子取首个非空 DIF）；柱=2×(DIF−DEA) */
+export function macd(
+  closes: number[],
+  fast = 12,
+  slow = 26,
+  signal = 9,
+): MacdPoint[] {
+  const ef = ema(closes, fast)
+  const es = ema(closes, slow)
+  const dif: Array<number | null> = closes.map((_, i) =>
+    ef[i] !== null && es[i] !== null ? (ef[i] as number) - (es[i] as number) : null,
+  )
+  const first = dif.findIndex((v) => v !== null)
+  const dea: Array<number | null> = dif.map(() => null)
+  if (first >= 0) {
+    const k = 2 / (signal + 1)
+    let prev = dif[first] as number
+    dea[first] = prev
+    for (let i = first + 1; i < dif.length; i += 1) {
+      prev = (dif[i] as number) * k + prev * (1 - k)
+      dea[i] = prev
+    }
+  }
+  return dif.map((v, i) => ({
+    dif: v,
+    dea: dea[i],
+    hist: v !== null && dea[i] !== null ? 2 * (v - (dea[i] as number)) : null,
+  }))
+}
+
+/** RSI（Wilder 平滑，首值 SMA(n)：前 n 个变化的平均，此后 (prev×(n−1)+cur)/n） */
+export function rsiWilder(closes: number[], n = 14): Array<number | null> {
+  const out: Array<number | null> = closes.map(() => null)
+  if (closes.length <= n) return out
+  let gain = 0
+  let loss = 0
+  for (let i = 1; i <= n; i += 1) {
+    const ch = closes[i] - closes[i - 1]
+    if (ch > 0) gain += ch
+    else loss -= ch
+  }
+  let avgGain = gain / n
+  let avgLoss = loss / n
+  out[n] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss)
+  for (let i = n + 1; i < closes.length; i += 1) {
+    const ch = closes[i] - closes[i - 1]
+    avgGain = (avgGain * (n - 1) + Math.max(ch, 0)) / n
+    avgLoss = (avgLoss * (n - 1) + Math.max(-ch, 0)) / n
+    out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss)
+  }
+  return out
+}
+
+export interface BollPoint {
+  mid: number | null
+  upper: number | null
+  lower: number | null
+}
+
+/** BOLL(n,k)：中轨 SMA(n)，上下轨 ±k×总体标准差 */
+export function boll(closes: number[], n = 20, k = 2): BollPoint[] {
+  return closes.map((_, i) => {
+    if (i < n - 1) return { mid: null, upper: null, lower: null }
+    const win = closes.slice(i - n + 1, i + 1)
+    const mid = win.reduce((a, b) => a + b, 0) / n
+    const sd = Math.sqrt(win.reduce((a, b) => a + (b - mid) ** 2, 0) / n)
+    return { mid, upper: mid + k * sd, lower: mid - k * sd }
+  })
+}
+
+export interface KdjPoint {
+  k: number | null
+  d: number | null
+  j: number | null
+}
+
+/** KDJ(n,mv,sv)：RSV→K/D 递推（初值 50），J=3K−2D */
+export function kdj(
+  bars: Array<{ high: number; low: number; close: number }>,
+  n = 9,
+  mv = 3,
+  sv = 3,
+): KdjPoint[] {
+  let prevK = 50
+  let prevD = 50
+  return bars.map((b, i) => {
+    if (i < n - 1) return { k: null, d: null, j: null }
+    const win = bars.slice(i - n + 1, i + 1)
+    const hh = Math.max(...win.map((w) => w.high))
+    const ll = Math.min(...win.map((w) => w.low))
+    const rsv = hh === ll ? 50 : ((b.close - ll) / (hh - ll)) * 100
+    const k = ((mv - 1) * prevK + rsv) / mv
+    const d = ((sv - 1) * prevD + k) / sv
+    prevK = k
+    prevD = d
+    return { k, d, j: 3 * k - 2 * d }
+  })
+}
+
 export interface CumPoint {
   price: number
   cumVolume: number

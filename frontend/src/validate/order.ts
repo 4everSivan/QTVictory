@@ -111,7 +111,7 @@ export interface FeeEst {
 export function calcFee(amount: number, isBuy: boolean): FeeEst {
   const commission = round2(Math.max(amount * 0.00025, 5.0))
   const stampTax = isBuy ? 0 : round2(amount * 0.0005)
-  const transferFee = round2(amount * 0.0001)
+  const transferFee = round2(amount * 0.00001)
   return { commission, stampTax, transferFee, total: round2(commission + stampTax + transferFee) }
 }
 

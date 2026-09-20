@@ -12,6 +12,9 @@
   --up: #d71921;
   --down: #4a9e5c;
   --warn: #d4a843;
+  --ind3: #9d7cd8;
+  --ind4: #4db8c4;
+  --ind5: #e08a3c;
   --acc: #d71921;
   --dim: rgba(255, 255, 255, 0.12);
   --font-body: 'Space Grotesk', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -32,6 +35,9 @@
   --up: #d71921;
   --down: #2e7d42;
   --warn: #96700e;
+  --ind3: #7c5cbf;
+  --ind4: #2e8b96;
+  --ind5: #c26a1a;
   --acc: #d71921;
   --dim: rgba(0, 0, 0, 0.08);
   --font-body: 'Space Grotesk', 'PingFang SC', 'Microsoft YaHei', sans-serif;

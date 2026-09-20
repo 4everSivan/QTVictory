@@ -49,6 +49,10 @@ _F_BID1, _F_ASK1 = 9, 19
 
 @dataclass
 class NormalizedQuote:
+    """行情快照。当日 bar 聚合态（T25-2，02 §3.4/§3.11 冷热双态）：open/high/
+    low/last/cum_volume 为上游维护的当日累计态（vendor 全 tick 流口径，非本地
+    3s 采样）——"热 bar"即由此合成（kline_view），端点级不做任何注入。"""
+
     code: str
     name: str
     last: float

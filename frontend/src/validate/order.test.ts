@@ -69,16 +69,16 @@ describe('涨跌停带与有效申报区间（§6.1）', () => {
 })
 
 describe('费用与市价预估（engine.calc_fee 等价）', () => {
-  it('佣金 max(amt×0.00025, 5)；印花税卖出 0.0005；过户费 0.0001', () => {
+  it('佣金 max(amt×0.00025, 5)；印花税卖出 0.0005；过户费 0.00001（C020 中证登 2022-04-29 起现行口径）', () => {
     const buy = calcFee(10_000, true)
     expect(buy.commission).toBe(5)
     expect(buy.stampTax).toBe(0)
-    expect(buy.transferFee).toBe(1)
+    expect(buy.transferFee).toBe(0.1)
     const sell = calcFee(100_000, false)
     expect(sell.commission).toBe(25)
     expect(sell.stampTax).toBe(50)
-    expect(sell.transferFee).toBe(10)
-    expect(sell.total).toBe(85)
+    expect(sell.transferFee).toBe(1)
+    expect(sell.total).toBe(76)
   })
 
   it('最优五档剩余撤销：逐档吃量加权，不足标 fillableQty', () => {

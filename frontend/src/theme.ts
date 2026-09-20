@@ -21,6 +21,12 @@ export interface ChartTheme {
   crosshair: string
   areaUp: string
   areaDown: string
+  /** 指标色阶（01 §5.5 D6 用户拍板）：ind1=txt、ind2=warn 复用既有；ind3/4/5 新增令牌 */
+  ind1: string
+  ind2: string
+  ind3: string
+  ind4: string
+  ind5: string
 }
 
 export const CHART_THEMES: Record<ResolvedTheme, ChartTheme> = {
@@ -37,6 +43,11 @@ export const CHART_THEMES: Record<ResolvedTheme, ChartTheme> = {
     crosshair: '#333333',
     areaUp: 'rgba(215, 25, 33, 0.05)',
     areaDown: 'rgba(74, 158, 92, 0.05)',
+    ind1: '#e8e8e8',
+    ind2: '#d4a843',
+    ind3: '#9d7cd8',
+    ind4: '#4db8c4',
+    ind5: '#e08a3c',
   },
   light: {
     up: '#d71921',
@@ -51,6 +62,11 @@ export const CHART_THEMES: Record<ResolvedTheme, ChartTheme> = {
     crosshair: '#cccccc',
     areaUp: 'rgba(215, 25, 33, 0.08)',
     areaDown: 'rgba(46, 125, 66, 0.08)',
+    ind1: '#1a1a1a',
+    ind2: '#96700e',
+    ind3: '#7c5cbf',
+    ind4: '#2e8b96',
+    ind5: '#c26a1a',
   },
 }
 

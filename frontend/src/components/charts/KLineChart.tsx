@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KlineRow } from '../../api/types'
+import type { KlinePeriod } from '../../state/marketData'
+import { lsGet, lsSet } from '../../lib/storage'
 import {
+  boll,
   clampView,
   defaultView,
+  ema,
+  kdj,
   linearScale,
+  macd,
   maSeries,
   pan,
+  rsiWilder,
   zoom,
   type ViewWindow,
 } from './math'
@@ -16,26 +23,72 @@ const PAD_L = 4
 const PAD_R = 58
 const PAD_T = 26
 const DATE_AXIS = 16
-const VOL_RATIO = 0.2
+const SUB_RATIO = 0.22 // D3：副图高度比例 0.20 → 0.22
 const MA_STEPS = [5, 10, 20, 60] as const
-const MA_ALPHA: Record<number, number> = { 5: 1, 10: 0.55, 20: 0.32, 60: 1 }
+
+/** D6 指标色阶（用户拍板）：ind1 白 / ind2 黄 / ind3 紫 / ind4 青 / ind5 橙；红绿专属涨跌 */
+type OverlayId = 'ma' | 'ema' | 'boll'
+type SubId = 'vol' | 'macd' | 'rsi' | 'kdj'
+
+const OVERLAY_LABELS: Record<OverlayId, string> = { ma: 'MA', ema: 'EMA', boll: 'BOLL' }
+const SUB_LABELS: Array<[SubId, string]> = [
+  ['vol', 'VOL'],
+  ['macd', 'MACD'],
+  ['rsi', 'RSI'],
+  ['kdj', 'KDJ'],
+]
+
+const OVERLAY_KEY = 'qtv_kline_overlays'
+const SUB_KEY = 'qtv_kline_sub'
+
+/** 图例周期标签（T27-1/D5） */
+const PERIOD_LABELS: Record<KlinePeriod, string> = {
+  day: '日K',
+  week: '周K',
+  month: '月K',
+}
+
+function isOverlayId(v: string | null): v is OverlayId {
+  return v === 'ma' || v === 'ema' || v === 'boll'
+}
+
+function isSubId(v: string | null): v is SubId {
+  return v === 'vol' || v === 'macd' || v === 'rsi' || v === 'kdj'
+}
+
+function loadOverlays(): OverlayId[] {
+  const raw = lsGet(OVERLAY_KEY)
+  if (raw === null) return ['ma']
+  const parsed = raw.split(',').filter(isOverlayId)
+  return parsed
+}
+
+function loadSub(): SubId {
+  const stored = lsGet(SUB_KEY)
+  return isSubId(stored) ? stored : 'vol'
+}
 
 interface KLineChartProps {
   klines: KlineRow[]
+  /** 周期（T27-1）：影响图例/日期轴口径与默认副图（分时态不渲染本组件） */
+  period?: KlinePeriod
 }
 
 /**
- * 日 K（01 §5.1 全交互定稿）：
+ * K 线图（01 §5.1 全交互定稿 + §5.5 D1–D8）：
  * 默认 90 根 / 滚轮缩放 ×1.18（30~N）/ 拖拽平移 / 双击复位 /
- * 成交量子图 20% / MA5·10·20·60 透明度阶梯（MA60 灰虚线）/
- * 最新价虚线 + 右轴色块标签 / 十字光标 + OHLC 信息条 / 仅渲染可见区间。
+ * 单副图槽位（VOL｜MACD｜RSI｜KDJ，0.22）/ 主图叠加（MA｜EMA｜BOLL 独立开关可同开）/
+ * 指标色阶令牌 / 图例（日期+OHLC+涨跌幅+叠加当前值）/ 十字光标 / 仅渲染可见区间。
+ * MA 透明度阶梯废止改色相阶梯（§5.1 修订项，浅色对比度修复）。
  */
-export function KLineChart({ klines }: KLineChartProps) {
+export function KLineChart({ klines, period = 'day' }: KLineChartProps) {
   const [wrapRef, { width, height }] = useChartSize<HTMLDivElement>()
   const theme = useChartTheme()
   const total = klines.length
   const [view, setView] = useState<ViewWindow>(() => defaultView(total))
   const [cross, setCross] = useState<number | null>(null)
+  const [overlays, setOverlays] = useState<OverlayId[]>(loadOverlays)
+  const [sub, setSub] = useState<SubId>(loadSub)
   const drag = useRef<{ x: number; end: number; moved: boolean } | null>(null)
 
   useEffect(() => {
@@ -65,18 +118,48 @@ export function KLineChart({ klines }: KLineChartProps) {
     () => Object.fromEntries(MA_STEPS.map((n) => [n, maSeries(closes, n)])) as Record<number, Array<number | null>>,
     [closes],
   )
+  const emas = useMemo(
+    () => ({ 12: ema(closes, 12), 26: ema(closes, 26) }),
+    [closes],
+  )
+  const bolls = useMemo(() => boll(closes, 20, 2), [closes])
+  const macdSeries = useMemo(() => (sub === 'macd' ? macd(closes) : null), [sub, closes])
+  const rsiSeries = useMemo(() => (sub === 'rsi' ? rsiWilder(closes) : null), [sub, closes])
+  const kdjSeries = useMemo(
+    () => (sub === 'kdj' ? kdj(klines.map((k) => ({ high: k.high, low: k.low, close: k.close }))) : null),
+    [sub, klines],
+  )
 
   const start = Math.max(0, view.end - view.count)
   const visible = klines.slice(start, view.end)
-  const lo = Math.min(...visible.map((k) => k.low))
-  const hi = Math.max(...visible.map((k) => k.high))
-  const maxVol = Math.max(...visible.map((k) => k.volume), 1)
 
   const plotH = height - PAD_T - DATE_AXIS
-  const volH = plotH * VOL_RATIO
-  const priceH = plotH - volH
+  const subH = plotH * SUB_RATIO
+  const priceH = plotH - subH
+  const lo = Math.min(...visible.map((k) => k.low))
+  const hi = Math.max(...visible.map((k) => k.high))
   const y = linearScale([lo, hi], [PAD_T + priceH, PAD_T])
-  const yVol = linearScale([0, maxVol], [PAD_T + plotH, PAD_T + priceH + 2])
+
+  // 副图纵轴（按指标各自口径）
+  const subRange = useMemo<[number, number]>(() => {
+    if (sub === 'rsi' || sub === 'kdj') return [0, 100]
+    if (sub === 'macd') {
+      const vals: number[] = []
+      for (let i = start; i < view.end; i += 1) {
+        const p = macdSeries?.[i]
+        if (!p) continue
+        if (p.dif !== null) vals.push(p.dif)
+        if (p.dea !== null) vals.push(p.dea)
+        if (p.hist !== null) vals.push(p.hist)
+      }
+      if (vals.length === 0) return [-1, 1]
+      const m = Math.max(...vals.map(Math.abs), 1e-9)
+      return [-m, m]
+    }
+    const maxVol = Math.max(...visible.map((k) => k.volume), 1)
+    return [0, maxVol]
+  }, [sub, macdSeries, start, view.end, visible])
+  const ySub = linearScale(subRange, [PAD_T + plotH, PAD_T + priceH + 2])
 
   const x = (i: number) => PAD_L + (i + 0.5) * step
   const candleW = Math.max(1, Math.min(step * 0.62, 40))
@@ -91,6 +174,29 @@ export function KLineChart({ klines }: KLineChartProps) {
           ? theme.down
           : theme.flat
       : theme.flat
+
+  // 光标根（无光标显最新根，D5）
+  const focusIdx = cross !== null && cross >= start && cross < view.end ? cross : total - 1
+  const focus = total > 0 ? klines[focusIdx] : null
+  const focusPrev = focusIdx > 0 ? klines[focusIdx - 1].close : null
+  const focusPct =
+    focus && focusPrev && focusPrev > 0 ? ((focus.close - focusPrev) / focusPrev) * 100 : null
+
+  const maColor = (n: number): string =>
+    n === 5 ? theme.ind1 : n === 10 ? theme.ind2 : n === 20 ? theme.ind3 : theme.ind5
+
+  const toggleOverlay = (id: OverlayId) => {
+    setOverlays((cur) => {
+      const next = cur.includes(id) ? cur.filter((v) => v !== id) : [...cur, id]
+      lsSet(OVERLAY_KEY, next.join(','))
+      return next
+    })
+  }
+
+  const pickSub = (id: SubId) => {
+    setSub(id)
+    lsSet(SUB_KEY, id)
+  }
 
   const toIndex = (clientX: number): number => {
     const rect = wrapRef.current?.getBoundingClientRect()
@@ -128,8 +234,55 @@ export function KLineChart({ klines }: KLineChartProps) {
         setCross(null)
       }}
     >
+      {/* 主图叠加胶丸（顶栏第二胶丸组，可同开） */}
+      <div className="kline-pills kline-pills-overlay" data-testid="kline-overlay-pills">
+        {(Object.keys(OVERLAY_LABELS) as OverlayId[]).map((id) => (
+          <button
+            key={id}
+            type="button"
+            className={`pill ${overlays.includes(id) ? 'active' : ''}`}
+            aria-label={OVERLAY_LABELS[id]}
+            aria-pressed={overlays.includes(id)}
+            onClick={() => toggleOverlay(id)}
+          >
+            {OVERLAY_LABELS[id]}
+          </button>
+        ))}
+      </div>
+
       {width > 0 && height > 0 && (
         <svg width={width} height={height} className="chart-svg">
+          {/* 图例（D5）：主图左上 = 日期 + OHLC + 涨跌幅 + 叠加当前值；无光标显最新根 */}
+          {focus && (
+            <g data-testid="kline-legend">
+              <text x={PAD_L + 4} y={12} fontSize={10} fill={theme.txt2}>
+                <tspan fill={theme.txt2}>{`${PERIOD_LABELS[period]} ${focus.date} `}</tspan>
+                <tspan fill={theme.txt2}>{`开 ${focus.open.toFixed(2)}  高 ${focus.high.toFixed(2)}  低 ${focus.low.toFixed(2)}  收 ${focus.close.toFixed(2)}`}</tspan>
+                {focusPct !== null && (
+                  <tspan fill={focusPct >= 0 ? theme.up : theme.down}>{`  ${focusPct >= 0 ? '+' : ''}${focusPct.toFixed(2)}%`}</tspan>
+                )}
+              </text>
+              <text x={PAD_L + 4} y={22} fontSize={9}>
+                {overlays.includes('ma') &&
+                  MA_STEPS.map((n) => {
+                    const v = mas[n][focusIdx]
+                    return v === null ? null : (
+                      <tspan key={`ma${n}`} fill={maColor(n)}>{`MA${n} ${v.toFixed(2)}  `}</tspan>
+                    )
+                  })}
+                {overlays.includes('ema') && (
+                  <>
+                    <tspan fill={theme.ind4}>{`EMA12 ${(emas[12][focusIdx] ?? 0).toFixed(2)}  `}</tspan>
+                    <tspan fill={theme.ind4}>{`EMA26 ${(emas[26][focusIdx] ?? 0).toFixed(2)}  `}</tspan>
+                  </>
+                )}
+                {overlays.includes('boll') && bolls[focusIdx].mid !== null && (
+                  <tspan fill={theme.txt3}>{`BOLL ${(bolls[focusIdx].upper ?? 0).toFixed(2)}/${(bolls[focusIdx].mid ?? 0).toFixed(2)}/${(bolls[focusIdx].lower ?? 0).toFixed(2)}`}</tspan>
+                )}
+              </text>
+            </g>
+          )}
+
           {/* 最新价虚线 + 右轴色块 */}
           {last && (
             <g>
@@ -157,7 +310,27 @@ export function KLineChart({ klines }: KLineChartProps) {
             </g>
           )}
 
-          {/* 蜡烛与量柱：仅可见区间 */}
+          {/* BOLL 填充（先画底，再画蜡烛） */}
+          {overlays.includes('boll') && (() => {
+            const top: string[] = []
+            const bottom: string[] = []
+            for (let i = 0; i < visible.length; i += 1) {
+              const p = bolls[start + i]
+              if (p.mid === null || p.upper === null || p.lower === null) continue
+              top.push(`${x(i)},${y(p.upper)}`)
+              bottom.push(`${x(i)},${y(p.lower)}`)
+            }
+            if (top.length < 2) return null
+            return (
+              <polygon
+                points={`${top.join(' ')} ${bottom.reverse().join(' ')}`}
+                fill={theme.txt3}
+                opacity={0.06}
+              />
+            )
+          })()}
+
+          {/* 蜡烛：仅可见区间 */}
           {visible.map((k, i) => {
             const up = k.close >= k.open
             const color = up ? theme.up : theme.down
@@ -180,39 +353,240 @@ export function KLineChart({ klines }: KLineChartProps) {
                   stroke={color}
                   strokeWidth={1}
                 />
-                <rect
-                  x={x(i) - candleW / 2}
-                  y={yVol(k.volume)}
-                  width={candleW}
-                  height={Math.max(0, yVol(0) - yVol(k.volume))}
-                  fill={color}
-                  opacity={0.35}
-                />
               </g>
             )
           })}
 
-          {/* MA5/10/20/60：透明度阶梯，MA60 灰虚线 */}
-          {MA_STEPS.map((n) => {
-            const series = mas[n]
-            const pts: string[] = []
-            for (let i = 0; i < visible.length; i += 1) {
-              const v = series[start + i]
-              if (typeof v === 'number') pts.push(`${x(i)},${y(v)}`)
-            }
-            if (pts.length < 2) return null
-            return (
-              <polyline
-                key={n}
-                points={pts.join(' ')}
-                fill="none"
-                stroke={n === 60 ? theme.txt3 : theme.txt2}
+          {/* MA：色相阶梯（透明度阶梯废止，§5.1 修订项）；MA60 ind5 虚线 */}
+          {overlays.includes('ma') &&
+            MA_STEPS.map((n) => {
+              const series = mas[n]
+              const pts: string[] = []
+              for (let i = 0; i < visible.length; i += 1) {
+                const v = series[start + i]
+                if (typeof v === 'number') pts.push(`${x(i)},${y(v)}`)
+              }
+              if (pts.length < 2) return null
+              return (
+                <polyline
+                  key={n}
+                  points={pts.join(' ')}
+                  fill="none"
+                  stroke={maColor(n)}
+                  strokeWidth={1}
+                  strokeDasharray={n === 60 ? '5 4' : undefined}
+                />
+              )
+            })}
+
+          {/* EMA：族内同色（ind4 青），EMA26 虚线 */}
+          {overlays.includes('ema') &&
+            ([12, 26] as const).map((n) => {
+              const series = n === 12 ? emas[12] : emas[26]
+              const pts: string[] = []
+              for (let i = 0; i < visible.length; i += 1) {
+                const v = series[start + i]
+                if (typeof v === 'number') pts.push(`${x(i)},${y(v)}`)
+              }
+              if (pts.length < 2) return null
+              return (
+                <polyline
+                  key={n}
+                  points={pts.join(' ')}
+                  fill="none"
+                  stroke={theme.ind4}
+                  strokeWidth={1}
+                  strokeDasharray={n === 26 ? '5 4' : undefined}
+                />
+              )
+            })}
+
+          {/* BOLL 轨道：上下轨 txt3 细线，中轨 ind1 白虚线 */}
+          {overlays.includes('boll') &&
+            (['upper', 'mid', 'lower'] as const).map((band) => {
+              const pts: string[] = []
+              for (let i = 0; i < visible.length; i += 1) {
+                const p = bolls[start + i]
+                const v = band === 'upper' ? p.upper : band === 'lower' ? p.lower : p.mid
+                if (typeof v === 'number') pts.push(`${x(i)},${y(v)}`)
+              }
+              if (pts.length < 2) return null
+              return (
+                <polyline
+                  key={band}
+                  points={pts.join(' ')}
+                  fill="none"
+                  stroke={band === 'mid' ? theme.ind1 : theme.txt3}
+                  strokeWidth={1}
+                  strokeDasharray={band === 'mid' ? '4 4' : undefined}
+                  opacity={band === 'mid' ? 0.9 : 0.7}
+                />
+              )
+            })}
+
+          {/* 副图（单槽位 0.22）：VOL｜MACD｜RSI｜KDJ */}
+          <g data-testid="kline-sub">
+            <line
+              x1={PAD_L}
+              x2={width - PAD_R}
+              y1={PAD_T + priceH + 2}
+              y2={PAD_T + priceH + 2}
+              stroke={theme.line}
+              strokeWidth={1}
+            />
+            {sub === 'rsi' &&
+              ([30, 70] as const).map((t) => (
+                <line
+                  key={t}
+                  x1={PAD_L}
+                  x2={width - PAD_R}
+                  y1={ySub(t)}
+                  y2={ySub(t)}
+                  stroke={theme.txt3}
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                  opacity={0.5}
+                />
+              ))}
+            {sub === 'kdj' &&
+              ([20, 80] as const).map((t) => (
+                <line
+                  key={t}
+                  x1={PAD_L}
+                  x2={width - PAD_R}
+                  y1={ySub(t)}
+                  y2={ySub(t)}
+                  stroke={theme.txt3}
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                  opacity={0.5}
+                />
+              ))}
+            {sub === 'macd' && (
+              <line
+                x1={PAD_L}
+                x2={width - PAD_R}
+                y1={ySub(0)}
+                y2={ySub(0)}
+                stroke={theme.txt3}
                 strokeWidth={1}
-                opacity={n === 60 ? 1 : MA_ALPHA[n]}
-                strokeDasharray={n === 60 ? '5 4' : undefined}
+                strokeDasharray="3 3"
+                opacity={0.5}
               />
-            )
-          })}
+            )}
+
+            {sub === 'vol' &&
+              visible.map((k, i) => {
+                const up = k.close >= k.open
+                return (
+                  <rect
+                    key={`v-${k.date}`}
+                    x={x(i) - candleW / 2}
+                    y={ySub(k.volume)}
+                    width={candleW}
+                    height={Math.max(0, ySub(0) - ySub(k.volume))}
+                    fill={up ? theme.up : theme.down}
+                    opacity={0.35}
+                  />
+                )
+              })}
+
+            {sub === 'macd' &&
+              macdSeries &&
+              visible.map((k, i) => {
+                const p = macdSeries[start + i]
+                if (!p || p.hist === null) return null
+                const up = p.hist >= 0
+                return (
+                  <rect
+                    key={`m-${k.date}`}
+                    x={x(i) - candleW / 2}
+                    y={ySub(Math.max(p.hist, 0))}
+                    width={candleW}
+                    height={Math.max(1, Math.abs(ySub(p.hist) - ySub(0)))}
+                    fill={up ? theme.up : theme.down}
+                    opacity={0.7}
+                  />
+                )
+              })}
+            {sub === 'macd' &&
+              (['dif', 'dea'] as const).map((band, bi) => {
+                const pts: string[] = []
+                for (let i = 0; i < visible.length; i += 1) {
+                  const v = macdSeries?.[start + i]?.[band] ?? null
+                  if (typeof v === 'number') pts.push(`${x(i)},${ySub(v)}`)
+                }
+                if (pts.length < 2) return null
+                return (
+                  <polyline
+                    key={band}
+                    points={pts.join(' ')}
+                    fill="none"
+                    stroke={bi === 0 ? theme.ind1 : theme.ind2}
+                    strokeWidth={1}
+                  />
+                )
+              })}
+
+            {sub === 'rsi' &&
+              (() => {
+                const pts: string[] = []
+                for (let i = 0; i < visible.length; i += 1) {
+                  const v = rsiSeries?.[start + i] ?? null
+                  if (typeof v === 'number') pts.push(`${x(i)},${ySub(v)}`)
+                }
+                if (pts.length < 2) return null
+                return <polyline points={pts.join(' ')} fill="none" stroke={theme.ind3} strokeWidth={1} />
+              })()}
+
+            {sub === 'kdj' &&
+              (['k', 'd', 'j'] as const).map((band) => {
+                const pts: string[] = []
+                for (let i = 0; i < visible.length; i += 1) {
+                  const v = kdjSeries?.[start + i]?.[band] ?? null
+                  if (typeof v === 'number') pts.push(`${x(i)},${ySub(v)}`)
+                }
+                if (pts.length < 2) return null
+                return (
+                  <polyline
+                    key={band}
+                    points={pts.join(' ')}
+                    fill="none"
+                    stroke={band === 'k' ? theme.ind1 : band === 'd' ? theme.ind2 : theme.ind3}
+                    strokeWidth={band === 'j' ? 1 : 1.2}
+                  />
+                )
+              })}
+          </g>
+
+          {/* 副图图例（左上 = 指标名(参数) + 当前值） */}
+          <g data-testid="kline-legend-sub">
+            <text x={PAD_L + 4} y={PAD_T + priceH + 12} fontSize={9}>
+              {sub === 'vol' && <tspan fill={theme.txt3}>VOL</tspan>}
+              {sub === 'macd' && (
+                <>
+                  <tspan fill={theme.txt2}>MACD(12,26,9) </tspan>
+                  <tspan fill={theme.ind1}>{`DIF ${(macdSeries?.[focusIdx]?.dif ?? 0).toFixed(2)} `}</tspan>
+                  <tspan fill={theme.ind2}>{`DEA ${(macdSeries?.[focusIdx]?.dea ?? 0).toFixed(2)} `}</tspan>
+                  <tspan fill={theme.txt3}>{`柱 ${(macdSeries?.[focusIdx]?.hist ?? 0).toFixed(2)}`}</tspan>
+                </>
+              )}
+              {sub === 'rsi' && (
+                <>
+                  <tspan fill={theme.txt2}>RSI(14) </tspan>
+                  <tspan fill={theme.ind3}>{(rsiSeries?.[focusIdx] ?? 0).toFixed(2)}</tspan>
+                </>
+              )}
+              {sub === 'kdj' && (
+                <>
+                  <tspan fill={theme.txt2}>KDJ(9,3,3) </tspan>
+                  <tspan fill={theme.ind1}>{`K ${(kdjSeries?.[focusIdx]?.k ?? 0).toFixed(2)} `}</tspan>
+                  <tspan fill={theme.ind2}>{`D ${(kdjSeries?.[focusIdx]?.d ?? 0).toFixed(2)} `}</tspan>
+                  <tspan fill={theme.ind3}>{`J ${(kdjSeries?.[focusIdx]?.j ?? 0).toFixed(2)}`}</tspan>
+                </>
+              )}
+            </text>
+          </g>
 
           {/* 日期轴 */}
           {(() => {
@@ -228,18 +602,31 @@ export function KLineChart({ klines }: KLineChartProps) {
             ))
           })()}
 
-          {/* 十字光标 + OHLC 信息条 */}
+          {/* 十字光标 */}
           {cross !== null && cross >= start && cross < view.end && (
             <g>
               <line x1={x(cross - start)} x2={x(cross - start)} y1={PAD_T} y2={PAD_T + plotH} stroke={theme.crosshair} strokeDasharray="3 3" />
               <line x1={PAD_L} x2={width - PAD_R} y1={y(klines[cross].close)} y2={y(klines[cross].close)} stroke={theme.crosshair} strokeDasharray="3 3" />
-              <text x={PAD_L + 4} y={14} fontSize={10} fill={theme.txt2}>
-                {`${klines[cross].date}  开 ${klines[cross].open.toFixed(2)}  高 ${klines[cross].high.toFixed(2)}  低 ${klines[cross].low.toFixed(2)}  收 ${klines[cross].close.toFixed(2)}`}
-              </text>
             </g>
           )}
         </svg>
       )}
+
+      {/* 副图胶丸（副图右上、半透明底、贴被控对象） */}
+      <div className="kline-pills kline-pills-sub" data-testid="kline-sub-pills">
+        {SUB_LABELS.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={`pill ${sub === id ? 'active' : ''}`}
+            aria-label={label}
+            aria-pressed={sub === id}
+            onClick={() => pickSub(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

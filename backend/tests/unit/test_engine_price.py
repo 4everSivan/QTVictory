@@ -15,18 +15,19 @@ def mk_tick(code="600519", last=10.0, prev=10.0, bid=10.0, ask=10.0):
 
 class TestFee:
     def test_commission_stamp_transfer(self):
-        # 10 万买入：佣金 25 / 印花 0 / 过户 10
+        # 10 万买入：佣金 25 / 印花 0 / 过户 1（0.01‰ 十万分之一，中证登 2022-04-29 起现行口径）
         fee = calc_fee(100000.0, is_buy=True)
-        assert fee.commission == 25.0 and fee.stamp_tax == 0.0 and fee.transfer_fee == 10.0
-        assert fee.total == 35.0
-        # 10 万卖出：印花税 50
+        assert fee.commission == 25.0 and fee.stamp_tax == 0.0 and fee.transfer_fee == 1.0
+        assert fee.total == 26.0
+        # 10 万卖出：印花税 50 / 过户 1（双向收取）
         fee = calc_fee(100000.0, is_buy=False)
         assert fee.stamp_tax == 50.0
+        assert fee.transfer_fee == 1.0
 
     def test_min_commission_5(self):
         fee = calc_fee(1000.0, is_buy=True)
         assert fee.commission == 5.0  # 1000×0.00025=0.25 → 最低 5 元
-        assert fee.transfer_fee == 0.1
+        assert fee.transfer_fee == 0.01  # 1000×0.00001=0.01（十万分之一）
 
 
 class TestLimits:

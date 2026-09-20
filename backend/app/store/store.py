@@ -548,6 +548,14 @@ class Store:
             ).fetchall()
         return [dict(r) for r in reversed(rows)]
 
+    def klines_depth(self, code: str) -> int:
+        """库存深度（T25-4）：校准重拉深度 ≥ 库存深度约束的库存侧读数。"""
+        with self.db.lock:
+            row = self.db.conn.execute(
+                "SELECT COUNT(*) AS n FROM klines WHERE code = ?", (code,)
+            ).fetchone()
+        return int(row["n"]) if row else 0
+
     def upsert_minutes(self, rows: list[tuple]) -> None:
         with self.db.lock:
             self.db.conn.executemany(

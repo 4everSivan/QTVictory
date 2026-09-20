@@ -118,15 +118,46 @@ class TestEndpoints:
         assert q["source"] == "tencent" and q["quotes"]
         ctx.market.sync_klines([("sh600519", "2026-09-15", 10, 10.2, 10.3, 9.9, 123)])
         k = (await c.get("/api/market/kline", params={"code": "sh600519"})).json()
-        assert k["data"][-1]["close"] == 10.2
+        # T25：冷热合成——完结冷 bar 在前，当日未完结合成热 bar（close = 快照 last）在后
+        assert k["data"][-2]["close"] == 10.2
+        assert k["data"][-1]["date"] == "2026-09-16" and k["data"][-1]["close"] == 10.0
         # C013：minute 假参数移除——校验拒放并指向 /market/minute（统一错误模型 400）
         bad = await c.get("/api/market/kline",
                           params={"code": "sh600519", "period": "minute"})
         assert bad.status_code == 400
         assert bad.json()["code"] == "BAD_REQUEST"
-        bad2 = await c.get("/api/market/kline",
-                           params={"code": "sh600519", "period": "week"})
-        assert bad2.status_code == 400 and bad2.json()["code"] == "BAD_REQUEST"
+        bad3 = await c.get("/api/market/kline",
+                           params={"code": "sh600519", "period": "year"})
+        assert bad3.status_code == 400 and bad3.json()["code"] == "BAD_REQUEST"
+
+    async def test_kline_endpoint_serves_cold_hot_view(self, api):
+        """T25：/market/kline 读冷热合成序列——当日未完结合成热 bar。"""
+        c, ctx = api
+        ctx.market.sync_klines([("sh600519", "2026-09-15", 10, 10.2, 10.3, 9.9, 123)])
+        ctx.market.inject([quote(last=10.6, prev=10.2, cum=300_000)])
+        k = (await c.get("/api/market/kline", params={"code": "sh600519"})).json()
+        assert [r["date"] for r in k["data"]][-1] == "2026-09-16"
+        assert k["data"][-1]["close"] == 10.6
+
+    async def test_kline_period_week_aggregation(self, api):
+        """T26：period=week 离线注入聚合正确性（limit=聚合后根数）。"""
+        c, ctx = api
+        ctx.market.sync_klines([
+            ("sh600519", "2026-09-14", 10, 11, 12, 9, 100),   # 周一
+            ("sh600519", "2026-09-15", 11, 12, 13, 10, 200),
+            ("sh600519", "2026-09-18", 12, 13, 14, 12, 300),  # 周五
+            ("sh600519", "2026-09-21", 13, 14, 15, 13, 400),  # 次周一
+        ])
+        k = (await c.get("/api/market/kline",
+                         params={"code": "sh600519", "period": "week"})).json()
+        dates = [r["date"] for r in k["data"]]
+        assert dates == ["2026-09-18", "2026-09-21"]
+        assert k["data"][0]["volume"] == 600 and k["data"][0]["open"] == 10
+        assert k["data"][0]["close"] == 13
+        # limit = 聚合后根数：1 根 → 仅最近一周
+        k1 = (await c.get("/api/market/kline",
+                          params={"code": "sh600519", "period": "week", "limit": 1})).json()
+        assert [r["date"] for r in k1["data"]] == ["2026-09-21"]
 
     async def test_minute_default_date_fallback(self, api):
         """C018：缺省 date 无行回退最近有数交易日；显式 date 不回退。"""
