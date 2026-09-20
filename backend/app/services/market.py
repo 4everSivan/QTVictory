@@ -4,7 +4,8 @@
 - 降级链（C008）：腾讯（https→http 协议兜底）→ 新浪 → 东财 → 内置锚点，
   透出 source/live；新浪档含五档与累计量，视同主源完整档；
 - 内存最新档（MarketBus）+ ΔV 差分 + 停牌标志 + 新鲜度时钟（>30s）；
-- 日K 全量启动拉取（腾讯 ifzq → 东财 push2his 兜底）+ 每日增量；
+- 日K 全量启动拉取（腾讯 ifzq → 东财 push2his 兜底）
+  + 日切步骤 5 关注集重拉（C014，修复长运行末根冻结）；
   分钟线当日累积、新分钟桶触发增量落库（C012）、日切收口、停机兜底；
   新增自选码异步单码引导（T23，串行排队）；
 - 交易日历由快照时间戳推定；关注代码集 = 自选 ∪ 持仓 ∪ 计划池 ∪ 指数。
@@ -18,7 +19,7 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import date as date_cls, datetime, timedelta
 from typing import Any
 
 from app.adapters.fallback import EastmoneyAdapter, FallbackProvider
@@ -54,6 +55,7 @@ class MarketService:
         self._kline_boot_lock = asyncio.Lock()      # 自选码日K 引导串行排队（T23-3）
         self._kline_boot_tasks: set[asyncio.Task] = set()
         self._suggest_cache: dict[str, tuple[float, list[dict[str, str]]]] = {}
+        self._minute_boot_fail: dict[str, float] = {}   # 分时引导失败冷却（C019）
         self._client: Any = None
         self._tencent: TencentAdapter | None = None
         self._sina: SinaAdapter | None = None
@@ -225,6 +227,10 @@ class MarketService:
         minute = q.ts[:5] if ":" in q.ts else ""
         if not minute:
             return
+        # C018：时段门禁——仅前端 242 槽窗口（09:30–11:30 / 13:00–15:00）
+        # 落桶；盘后/周末快照 ts（15:0x 之后等）落的是槽外垃圾桶，不可见且污表
+        if not ("09:30" <= minute <= "11:30" or "13:00" <= minute <= "15:00"):
+            return
         key = (q.code, minute)
         if key not in self._minute_bars:
             self._minute_dirty = True   # 进入新分钟桶：触发增量刷盘（C012）
@@ -257,14 +263,35 @@ class MarketService:
     def _rollover_trading_date(self, now: datetime) -> None:
         today = now.strftime("%Y-%m-%d")
         current = self.ctx.store.get_state("trading_date")
-        if current != today:
-            if current is not None:
-                # 观测到新交易日：对前一交易日执行日切（幂等可重入）。
-                # 直接调同步内核——当前已可能处于串行基座回调内，嵌套提交会死锁
-                self.ctx.serial.submit(
-                    lambda: self.ctx.session._day_cut_sync(current or today)
-                )
+        if current == today:
+            return
+        if current is not None and current > today:
+            # C017：未来日期守卫——绝不因未来日期触发日切（原只判 !=，
+            # 周末 advance 到次交易日（周一 > 当日）会每轮 poll 再切一天，
+            # 滚雪球式伪日切把 trading_date 推进到远未来）。
+            # 小步超前（≤7 天）= 日切推进到的次交易日（跨周末/法定连休），保持；
+            # 大幅超前/不可解析 = 时钟回拨或状态污染，告警重同步回真实当日。
+            try:
+                gap = (
+                    date_cls.fromisoformat(current) - date_cls.fromisoformat(today)
+                ).days
+            except ValueError:
+                gap = 999
+            if gap <= 7:
+                return
+            log.warning(
+                "trading_date %s ahead of clock %s by %dd; resync",
+                current, today, gap,
+            )
             self.ctx.store.set_state("trading_date", today)
+            return
+        if current is not None:
+            # 观测到新交易日：对前一交易日执行日切（幂等可重入）。
+            # 直接调同步内核——当前已可能处于串行基座回调内，嵌套提交会死锁
+            self.ctx.serial.submit(
+                lambda: self.ctx.session._day_cut_sync(current or today)
+            )
+        self.ctx.store.set_state("trading_date", today)
 
     # -- 视图 --------------------------------------------------------------
 
@@ -346,6 +373,30 @@ class MarketService:
             except Exception:
                 log.warning("kline bootstrap for %s failed", code, exc_info=True)
 
+    def schedule_daily_kline_refresh(self) -> str:
+        """日切步骤 5（C014/BG-0008）：关注集日K重拉。修复长运行实例
+        klines 末根冻结于上次启动时刻的缺陷（文档宣称的"每日增量"原为
+        noop）；幂等 upsert，单码失败仅告警不阻断日切；离线无适配器为空操作。"""
+        if self._tencent is None:
+            return "noop"
+        task = asyncio.create_task(self._refresh_daily_klines(),
+                                   name="kline-daily-refresh")
+        self._kline_boot_tasks.add(task)
+        task.add_done_callback(self._kline_boot_tasks.discard)
+        return "scheduled"
+
+    async def _refresh_daily_klines(self) -> None:
+        async with self._kline_boot_lock:  # 与单码引导共用串行排队
+            for code in self.watchlist():
+                try:
+                    rows = await self._fetch_daily_chain(code)
+                    if rows:
+                        await asyncio.to_thread(self.ctx.store.upsert_klines, rows)
+                except Exception:
+                    log.warning("daily kline refresh for %s failed", code,
+                                exc_info=True)
+            log.info("daily kline refresh done")
+
     # -- 自选股支撑（T23）：快照探测与名称联想 ---------------------------------
 
     async def probe_code(self, code: str) -> NormalizedQuote | None:
@@ -378,6 +429,37 @@ class MarketService:
     def sync_klines(self, rows: list[tuple]) -> None:
         """增量/测试注入：[(code, date, open, close, high, low, volume)]。"""
         self.ctx.store.upsert_klines(rows)
+
+    async def bootstrap_latest_minutes(self, code: str) -> str | None:
+        """最近交易日分时引导（C019/EN-0009）：/market/minute 缺省查询经
+        回退仍空时触发；仅补最近一个交易日（Q8 边界修订，更深历史不回补），
+        幂等 upsert；失败/空结果 10 分钟冷却防无效码反复打上游。"""
+        if self._tencent is None:
+            return None
+        now = time.monotonic()
+        if now - self._minute_boot_fail.get(code, -1e9) < 600:
+            return None
+        try:
+            result = await self._tencent.fetch_latest_minutes(code)
+        except Exception:
+            log.warning("latest minutes bootstrap for %s failed", code,
+                        exc_info=True)
+            self._minute_boot_fail[code] = now
+            return None
+        if not result:
+            self._minute_boot_fail[code] = now
+            return None
+        day, rows = result
+        # 与实时落桶同一时段门禁（C018）：上游可能带 15:00 后参考点，槽外丢弃
+        rows = [r for r in rows
+                if "09:30" <= r[2] <= "11:30" or "13:00" <= r[2] <= "15:00"]
+        if not rows:
+            self._minute_boot_fail[code] = now
+            return None
+        await asyncio.to_thread(self.ctx.store.upsert_minutes, rows)
+        log.info("latest minutes bootstrapped for %s @%s (%d rows)",
+                 code, day, len(rows))
+        return day
 
     def persist_minutes(self, date: str) -> int:
         """当日分钟线落库（Q8：自部署日起逐日累积）。"""

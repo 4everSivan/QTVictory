@@ -1,7 +1,7 @@
 """交易服务（T07，02 §3.6 / §6.1 集成侧 / §5.4）。
 
-- 下单校验链（§3.6 顺序）：会话 → 交易员 → 停牌 → 申报单位 → 价格范围 →
-  市价类型 → 冻结 → 可用 → 计划约束 → 生成订单（origin）；
+- 下单校验链（§3.6 顺序）：会话 → 交易员 → 停牌 → 品种准入（C015 白名单）→
+  申报单位 → 价格范围 → 市价类型 → 冻结 → 可用 → 计划约束 → 生成订单（origin）；
 - 撮合 tick 集成：限额池按到达顺序分配，一单多笔成交落库；
 - 撤单与解冻（可撤窗口 = 连续竞价与 9:15–9:20）；
 - clientOrderId 服务端幂等兜底（与 API 幂等中间件双层）。
@@ -16,7 +16,7 @@ from typing import Any
 
 from app.domain.engine import (
     Tick, auction_match, buy_freeze, calc_fee, limit_match, lot_ok,
-    market_match, release_freeze, tick_volume_cap, valid_band,
+    market_match, release_freeze, tick_volume_cap, tradable_ok, valid_band,
 )
 from app.errors import BizError
 
@@ -61,8 +61,17 @@ class TradingService:
         quote = self.ctx.market.quote(code)
         if quote is None or quote.last <= 0:
             raise BizError("SUSPENDED", f"{code} 无有效行情（停牌或未关注）", {"code": code}, 409)
+        # C015：品种准入白名单——指数/基金/债券/北交所等行情可及但撮合规则未覆盖
+        # （02 §6.1 规则适用范围），拒单防错规则误用；裸码无前缀同样不在白名单
+        if not tradable_ok(code):
+            raise BizError(
+                "UNSUPPORTED_BOARD",
+                "品种不在可交易白名单（仅沪深主板/创业板/科创板个股）",
+                {"code": code},
+            )
 
-        market_type = payload.get("marketType", "best5_cancel")
+        # C016：marketType 契约容忍 null/缺省（前端限价单发 null），归一为默认类型
+        market_type = payload.get("marketType") or "best5_cancel"
         if otype == "market" and market_type not in ("best5_cancel", "opponent_best"):
             raise BizError("BAD_REQUEST", "marketType 必须为 best5_cancel | opponent_best", None, 422)
 

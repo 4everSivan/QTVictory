@@ -48,6 +48,12 @@ describe('错误码 → 文案映射（01 §6 全表）', () => {
     }
   })
 
+  it('UNSUPPORTED_BOARD：field 级呈现白名单口径（C015）', () => {
+    const p = presentError(err('UNSUPPORTED_BOARD', { code: 'sh000300' }, '品种不在可交易白名单'))
+    expect(p.level).toBe('field')
+    expect(p.text).toContain('白名单')
+  })
+
   it('未识别码：回落通用文案并 console 告警（不白屏）', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const p = presentError(err('FUTURE_CODE_X'))

@@ -89,6 +89,20 @@ def board_code(code: str) -> str:
     return code[2:] if code[:2] in ("sh", "sz", "bj") and len(code) > 6 else code
 
 
+def tradable_ok(code: str) -> bool:
+    """品种准入白名单（C015）：仅放行撮合规则已覆盖的沪深主板/创业板/科创板
+    个股（sh 60/68、sz 00/30 前缀规范码）；指数（sh000/sz399）、基金/ETF、
+    债券、北交所（bj）等行情可及但规则未覆盖的品种，下单与计划标的池拒单。"""
+    if len(code) != 8 or not code[2:].isdigit():
+        return False
+    prefix, pure = code[:2], code[2:]
+    if prefix == "sh":
+        return pure.startswith(("60", "68"))
+    if prefix == "sz":
+        return pure.startswith(("00", "30"))
+    return False
+
+
 def limit_pct(code: str) -> float:
     """涨跌停幅度：主板 ±10%，创业板(30)/科创板(688) ±20%。"""
     pure = board_code(code)

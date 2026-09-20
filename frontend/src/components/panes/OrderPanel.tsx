@@ -91,7 +91,7 @@ export function OrderPanel({ quote }: OrderPanelProps) {
         type: orderType,
         price: orderType === 'limit' ? priceNum : null,
         qty: qtyNum,
-        marketType: orderType === 'market' ? marketType : null,
+        marketType: orderType === 'market' ? marketType : undefined,
         clientOrderId: `ui-${Date.now()}`,
       })
       toast('success', `${side === 'buy' ? '买入' : '卖出'}委托已提交 ${code} ×${qtyNum}`)

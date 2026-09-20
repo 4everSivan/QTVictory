@@ -38,6 +38,25 @@ class TestScopeNormalization:
         finally:
             await ctx.stop()
 
+    async def test_create_rejects_unsupported_board(self):
+        """C015：指数/ETF/北交所标的（含归一后）计划池拒收，防错规则静默撮合。"""
+        from app.errors import BizError
+
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            t = await ctx.traders.create({"name": "t", "mode": "manual", "initCash": 100000})
+            for codes in (["sh000300"], ["510300"], ["bj430047"]):
+                try:
+                    await ctx.plans.create_plan({
+                        "traderId": t["id"], "scope": {"codes": codes},
+                    })
+                    raise AssertionError(f"should reject {codes}")
+                except BizError as e:
+                    assert e.code == "UNSUPPORTED_BOARD" and e.status == 422
+        finally:
+            await ctx.stop()
+
     async def test_legacy_bare_scope_healed_on_view_and_fence(self):
         """存量裸码行：视图回显规范码；围栏按归一码放行（下单码为规范码）。"""
         _, ctx = make_app()

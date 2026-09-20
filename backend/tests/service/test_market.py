@@ -4,7 +4,12 @@ import asyncio
 import json
 
 from app.adapters.sina import parse_sina_payload
-from app.adapters.tencent import NormalizedQuote, TencentAdapter, parse_quote_payload
+from app.adapters.tencent import (
+    NormalizedQuote,
+    TencentAdapter,
+    parse_latest_minutes_payload,
+    parse_quote_payload,
+)
 from tests.harness import inject, make_app, quote
 
 
@@ -459,3 +464,94 @@ class TestKlineBootstrapContract:
         finally:
             await ctx.stop()
         assert len(got) == 1
+
+
+class TestRolloverFutureGuard:
+    """C017（BG-0011）：trading_date 未来日期守卫——周末次交易日保持、
+    远未来污染重同步、过去日期正常日切；未来日期绝不触发日切。"""
+
+    def _daycut_marks(self, ctx, d: str) -> list[str]:
+        rows = ctx.store.db.conn.execute(
+            "SELECT key FROM sync_state WHERE key LIKE ?", (f"daycut:{d}:%",)
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    async def test_next_trading_day_kept_on_weekend(self):
+        """周日真实时钟 + trading_date=周一（日切推进的次交易日）：
+        不触发日切、不回写，保持周一。"""
+        _, ctx = make_app(clock_start="2026-09-20T10:00:00")  # 周日
+        await ctx.start()
+        try:
+            ctx.store.set_state("trading_date", "2026-09-21")  # 周一
+            await inject(ctx, quote())
+            assert ctx.store.get_state("trading_date") == "2026-09-21"
+            assert self._daycut_marks(ctx, "2026-09-21") == []
+        finally:
+            await ctx.stop()
+
+    async def test_far_future_pollution_resynced_without_day_cut(self):
+        """远未来污染（2028）→ 告警重同步为真实当日，且不补日切。"""
+        _, ctx = make_app(clock_start="2026-09-20T10:00:00")
+        await ctx.start()
+        try:
+            ctx.store.set_state("trading_date", "2028-12-21")
+            await inject(ctx, quote())
+            assert ctx.store.get_state("trading_date") == "2026-09-20"
+            assert self._daycut_marks(ctx, "2028-12-21") == []
+        finally:
+            await ctx.stop()
+
+    async def test_past_date_triggers_day_cut(self):
+        """正常新交易日（库存过去日期）→ 触发日切并推进到真实当日。"""
+        _, ctx = make_app(clock_start="2026-09-16T09:30:00")  # 周三
+        await ctx.start()
+        try:
+            ctx.store.set_state("trading_date", "2026-09-15")  # 周二
+            await inject(ctx, quote())
+            assert ctx.store.get_state("trading_date") == "2026-09-16"
+            assert ctx.store.get_state("daycut:2026-09-15:eol_cancel") == "done"
+        finally:
+            await ctx.stop()
+
+    async def test_minute_session_gate(self):
+        """C018：时段门禁——槽外 ts（盘后/周末）不落桶，槽内边界正常。"""
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            await inject(ctx, quote(ts="15:35:00"))   # 盘后 ts：丢弃
+            await inject(ctx, quote(ts="16:14:00"))   # 周末快照 ts：丢弃
+            await inject(ctx, quote(ts="09:25:00"))   # 集合竞价（槽外）：丢弃
+            assert ctx.market._minute_bars == {}
+            for ts in ("09:30:00", "11:30:00", "13:00:00", "15:00:00"):
+                await inject(ctx, quote(ts=ts))
+            assert sorted(m for _, m in ctx.market._minute_bars) == [
+                "09:30", "11:30", "13:00", "15:00"]
+        finally:
+            await ctx.stop()
+
+
+class TestLatestMinutesParse:
+    """C019：app/day/query 最近交易日分时解析（个股单对象/指数列表形态）。"""
+
+    def test_stock_object_form(self):
+        payload = {"data": {"sh600519": {"data": {
+            "date": "20260918",
+            "data": ["0930 1262.99 113 14271787.32", "0931 1259.18 529 66704818.26"],
+        }}}}
+        day, rows = parse_latest_minutes_payload("sh600519", payload)
+        assert day == "2026-09-18"
+        assert rows == [("sh600519", "2026-09-18", "09:30", 1262.99, 11300),
+                        ("sh600519", "2026-09-18", "09:31", 1259.18, 52900)]
+
+    def test_index_list_form(self):
+        payload = {"data": {"sh000300": {"data": [
+            {"date": "20260918", "data": ["0930 4492.32 1574960 4582694532.60"]},
+        ]}}}
+        day, rows = parse_latest_minutes_payload("sh000300", payload)
+        assert day == "2026-09-18"
+        assert rows == [("sh000300", "2026-09-18", "09:30", 4492.32, 157496000)]
+
+    def test_garbage_returns_none(self):
+        assert parse_latest_minutes_payload("sh600519", {"data": {}}) is None
+        assert parse_latest_minutes_payload(
+            "sh600519", {"data": {"sh600519": {"data": {"date": "bad", "data": []}}}}) is None

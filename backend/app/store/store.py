@@ -567,6 +567,15 @@ class Store:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def latest_minute_date(self, code: str) -> str | None:
+        """该码最近有分时数据的交易日（C018：minute 缺省日期回退用）。"""
+        with self.db.lock:
+            row = self.db.conn.execute(
+                "SELECT MAX(date) AS d FROM minute_klines WHERE code = ?",
+                (code,),
+            ).fetchone()
+        return row["d"] if row and row["d"] else None
+
     def upsert_actions(self, rows: list[tuple]) -> None:
         with self.db.lock:
             self.db.conn.executemany(

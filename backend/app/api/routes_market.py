@@ -6,6 +6,8 @@ import asyncio
 
 from fastapi import APIRouter, Query, Request
 
+from app.errors import BizError
+
 router = APIRouter()
 
 
@@ -26,9 +28,12 @@ async def market_kline(
     period: str = "day",
     limit: int = Query(250, ge=1, le=5000),
 ):
-    if period not in ("day", "minute"):
-        return {"code": "BAD_REQUEST", "message": "period 必须为 day | minute",
-                "details": None}
+    # C013：minute 假参数移除（原校验放行但恒返回日K行）；分时统一走
+    # /market/minute，week/month 待 §3.11 多周期落地后放行
+    if period != "day":
+        raise BizError(
+            "BAD_REQUEST",
+            "period 当前仅支持 day；分时数据请用 /market/minute", None, 400)
     ctx = request.app.state.ctx
     rows = await asyncio.to_thread(ctx.store.klines_for, code, limit)
     return {"code": code, "period": period, "data": rows}
@@ -41,8 +46,25 @@ async def market_minute(
     date: str | None = None,
 ):
     ctx = request.app.state.ctx
-    day = date or ctx.store.get_state("trading_date") or ""
+    if date is not None:
+        # 显式 date：精确查询，不回退
+        rows = await asyncio.to_thread(ctx.store.minutes_for, code, date)
+        return {"code": code, "date": date, "data": rows}
+    # C018：缺省 date = trading_date；该日无行（非交易时段/尚未出数）时
+    # 回退该码最近有分时数据的交易日，响应 date 如实标识实际日期
+    day = ctx.store.get_state("trading_date") or ""
     rows = await asyncio.to_thread(ctx.store.minutes_for, code, day)
+    if not rows:
+        fallback = await asyncio.to_thread(ctx.store.latest_minute_date, code)
+        if fallback and fallback != day:
+            day = fallback
+            rows = await asyncio.to_thread(ctx.store.minutes_for, code, day)
+    if not rows:
+        # C019：回退仍空 → 最近交易日分时引导（单日全量，幂等落库后返回）
+        boot_day = await ctx.market.bootstrap_latest_minutes(code)
+        if boot_day:
+            day = boot_day
+            rows = await asyncio.to_thread(ctx.store.minutes_for, code, day)
     return {"code": code, "date": day, "data": rows}
 
 

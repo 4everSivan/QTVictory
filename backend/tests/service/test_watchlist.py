@@ -186,12 +186,9 @@ class TestWatchSetUnion:
             await ctx.traders.create({"name": "p", "mode": "manual", "initCash": 100000})
             await ctx.plans.create_plan({"traderId": 2, "name": "p",
                                          "scope": {"codes": ["300750"]}})
-            await inject(ctx, quote(code="600519"))
-            await ctx.trading.submit_order(1, {
-                "side": "buy", "type": "limit", "code": "600519",  # 裸码持仓（历史行形态）
-                "price": 10.0, "qty": 100,
-            })
-            await inject(ctx, quote(code="600519"))  # 裸码 tick 与订单匹配成交
+            # 裸码持仓（历史行形态）：C015 起下单链路拒收裸码（UNSUPPORTED_BOARD），
+            # 存量行改为直接落库模拟，本用例关注集语义不变
+            ctx.store.upsert_position(1, "600519", 100, 10.0, 0)
             await ctx.watchlist.add("600519")
             await ctx.watchlist.add("300750")
             watch = ctx.market.watchlist()

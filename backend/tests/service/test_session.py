@@ -1,5 +1,6 @@
 """T08：时段状态机 / 日切幂等 / 公司行动（02 §6.4 / §6.6 / §6.12）。"""
 
+import asyncio
 from datetime import datetime
 
 from tests.harness import inject, make_app, quote
@@ -131,6 +132,71 @@ class TestDayCut:
             await ctx.session.day_cut("2026-09-16")
             trader = ctx.store.get_trader(tid)
             assert trader["cash"] == pytest_approx(100000 - (10000 + 6.0) + 1000 * 0.50)
+        finally:
+            await ctx.stop()
+
+
+class TestKlineIncrementRefresh:
+    """C014（BG-0008）：日切步骤 5 落实为关注集日K重拉，离线为空操作。"""
+
+    class _FakeKlineSource:
+        def __init__(self, rows):
+            self.rows = rows
+            self.called: list[str] = []
+
+        async def fetch_daily_klines(self, code, limit=320):
+            self.called.append(code)
+            return self.rows
+
+    async def test_offline_noop(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            report = await ctx.session.day_cut("2026-09-16")
+            assert report["steps"]["kline_increment"] == "noop"
+        finally:
+            await ctx.stop()
+
+    async def test_refresh_scheduled_and_applied(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            ctx.market.set_watch_override(["sh600519"])
+            src = self._FakeKlineSource(
+                [("sh600519", "2026-09-16", 10, 10.5, 10.6, 9.9, 456)])
+            ctx.market._tencent = src
+            report = await ctx.session.day_cut("2026-09-16")
+            assert report["steps"]["kline_increment"] == "scheduled"
+            if ctx.market._kline_boot_tasks:  # 等重拉任务收尾（幂等 upsert）
+                await asyncio.gather(*ctx.market._kline_boot_tasks)
+            # 关注集 = override ∪ 指数，逐码经 腾讯 ifzq → 东财兜底 链重拉
+            assert src.called == ["sh000300", "sh600519"]
+            got = ctx.store.klines_for("sh600519", limit=1)
+            assert got and got[0]["close"] == 10.5
+            # 幂等重入：checkpoint 跳过，不重复调度
+            report2 = await ctx.session.day_cut("2026-09-16")
+            assert report2["steps"]["kline_increment"] == "skipped"
+        finally:
+            await ctx.stop()
+
+    async def test_refresh_failure_does_not_block_day_cut(self):
+        _, ctx = make_app()
+        await ctx.start()
+        try:
+            ctx.market.set_watch_override(["sh600519"])
+            src = self._FakeKlineSource(rows=None)
+
+            async def dead(code, limit=320):
+                raise RuntimeError("kline source dead")
+
+            src.fetch_daily_klines = dead  # type: ignore[method-assign]
+            ctx.market._tencent = src
+            ctx.market._eastmoney = None
+            report = await ctx.session.day_cut("2026-09-16")
+            assert report["steps"]["kline_increment"] == "scheduled"
+            assert report["steps"]["advance_date"] == "2026-09-17"
+            if ctx.market._kline_boot_tasks:
+                await asyncio.gather(*ctx.market._kline_boot_tasks)
         finally:
             await ctx.stop()
 

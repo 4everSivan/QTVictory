@@ -80,10 +80,27 @@ function tickEmit(): void {
   for (const l of tickListeners) l()
 }
 
+/** C018：已预取分时的码随 quotes 包络滚动刷新（每自然分钟至多一次），
+ *  修复"选中即永久缓存、盘中须手动 reload"缺陷。 */
+const minuteRefetchStamp = new Map<string, string>()
+
+function maybeRefetchMinute(code: string, ts: string): void {
+  const key = minuteKey(code)
+  if (!cache.has(key)) return // 未预取的码不主动拉
+  const stamp = ts.slice(0, 16) // YYYY-MM-DDTHH:MM
+  if (stamp.length < 16 || minuteRefetchStamp.get(code) === stamp) return
+  minuteRefetchStamp.set(code, stamp)
+  api
+    .get<{ code: string; date: string; data: MinuteRow[] }>(`/market/minute?code=${code}`)
+    .then((r) => setCache(key, r.data))
+    .catch(() => undefined) // 刷新失败沿用旧缓存，下一分钟再试
+}
+
 export function ingestQuotesEnvelope(quotes: Quote[], ts: string): void {
   let changed = false
   for (const q of quotes) {
     if (q.last <= 0) continue
+    maybeRefetchMinute(q.code, ts)
     const prev = lastCum.get(q.code)
     lastCum.set(q.code, q.volume)
     if (prev === undefined || q.volume <= prev) continue

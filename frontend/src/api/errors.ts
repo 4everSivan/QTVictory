@@ -71,6 +71,7 @@ export const ERROR_MAP: Record<string, ErrorSpec> = {
   PLAN_CONSTRAINT: { level: 'toast', text: (m) => m || '计划约束拒绝（围栏过滤）' },
   RATE_LIMITED: { level: 'toast', text: () => '请求超限，请稍后再试' },
   SUSPENDED: { level: 'field', text: (m) => m || '标的无有效行情（停牌或未关注）' },
+  UNSUPPORTED_BOARD: { level: 'field', text: (m) => m || '品种不可交易（仅沪深主板/创业板/科创板个股）' },
   TRADER_NOT_FOUND: { level: 'toast', text: () => '交易员不存在' },
   TRADER_CLOSED: { level: 'toast', text: () => '交易员已关闭' },
   PLAN_NOT_FOUND: { level: 'toast', text: () => '计划不存在' },

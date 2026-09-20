@@ -16,6 +16,7 @@ from typing import Any
 QUOTE_URL = "https://qt.gtimg.cn/q="
 QUOTE_URL_HTTP = "http://qt.gtimg.cn/q="
 KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+MINUTE_LATEST_URL = "https://web.ifzq.gtimg.cn/appstock/app/day/query"
 SUGGEST_URL = "https://smartbox.gtimg.cn/s3/"
 
 # smartbox 类别归一（T23-4）：GP-A/GP-B→stock、ZS→index，其余小写透传（ETF/LOF/…）
@@ -145,6 +146,34 @@ def parse_suggest_payload(text: str) -> list[dict[str, str]]:
     return out
 
 
+def parse_latest_minutes_payload(code: str, payload: dict) -> tuple[str, list[tuple]] | None:
+    """app/day/query 最近交易日分时解析（C019，纯函数）。
+
+    实测响应形态（2026-09-20）：个股 `data.{code}.data` 为单对象
+    `{"date": "YYYYMMDD", "data": [...]}`，指数为单元素列表；
+    条目 `"HHMM 价 累计量 成交额"`，累计量纲与快照一致（手/688 股）。
+    返回 `(date_iso, [(code, date, HH:MM, price, cum_volume股)])`，无数据 None。
+    """
+    node = payload.get("data", {}).get(code, {}).get("data")
+    if isinstance(node, list):
+        node = node[0] if node else None
+    if not isinstance(node, dict):
+        return None
+    raw_date, rows = str(node.get("date", "")), node.get("data") or []
+    if len(raw_date) != 8 or not raw_date.isdigit() or not rows:
+        return None
+    day = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}"
+    out: list[tuple] = []
+    for entry in rows:
+        parts = str(entry).split()
+        if len(parts) < 3 or len(parts[0]) != 4 or not parts[0].isdigit():
+            continue
+        hhmm = f"{parts[0][:2]}:{parts[0][2:]}"
+        out.append((code, day, hhmm, round(_num(parts[1]), 3),
+                    _to_shares(code, _num(parts[2]))))
+    return (day, out) if out else None
+
+
 class TencentAdapter:
     """网络请求封装（解析逻辑在纯函数中，可离线测试）。"""
 
@@ -177,6 +206,12 @@ class TencentAdapter:
             out.append((code, row[0], float(row[1]), float(row[2]), float(row[3]),
                         float(row[4]), int(float(row[5]))))
         return out
+
+    async def fetch_latest_minutes(self, code: str) -> tuple[str, list[tuple]] | None:
+        """最近交易日分时（C019）：app/day/query，单日全量约 242 点。"""
+        resp = await self.client.get(MINUTE_LATEST_URL, params={"code": code})
+        resp.raise_for_status()
+        return parse_latest_minutes_payload(code, resp.json())
 
     async def fetch_corporate_actions(self, codes: list[str], next_date: str) -> list[tuple]:
         """公司行动采集钩子：公开免费源无稳定接口，默认返回空

@@ -113,9 +113,9 @@ class SessionService:
         self.ctx.store.t1_reset_all()
         return "ok"
 
-    # 步骤 5：日K增量（离线/测试为空操作，实盘由行情适配器拉取）
+    # 步骤 5：日K增量（C014：关注集日K重拉，离线/测试为空操作）
     def _step_kline_increment(self, d: str) -> str:
-        return "noop"
+        return self.ctx.market.schedule_daily_kline_refresh()
 
     # 步骤 6：当日分钟线落库
     def _step_minute_persist(self, d: str) -> int:

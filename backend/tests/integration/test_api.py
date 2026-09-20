@@ -93,6 +93,24 @@ class TestEndpoints:
             resp = await c.get(f"/api/traders/{tid}/{path}")
             assert resp.status_code == 200
 
+    async def test_order_market_type_nullable_contract(self, api):
+        """C016：限价单 marketType=null（前端口径）不再 422；市价单缺省回落 best5_cancel。"""
+        c, ctx = api
+        tid = (await c.post("/api/traders", json={
+            "name": "t", "mode": "manual", "initCash": 200000})).json()["id"]
+        ctx.market.inject([quote()])
+        limit = await c.post(f"/api/traders/{tid}/orders", json={
+            "side": "buy", "type": "limit", "code": "sh600519",
+            "price": 10.0, "qty": 100, "marketType": None,
+        })
+        assert limit.status_code == 201
+        assert limit.json()["market_type"] is None  # 限价单不落市价类型
+        mkt = await c.post(f"/api/traders/{tid}/orders", json={
+            "side": "buy", "type": "market", "code": "sh600519", "qty": 100,
+        })
+        assert mkt.status_code == 201
+        assert mkt.json()["market_type"] == "best5_cancel"  # 缺省归一默认类型
+
     async def test_market_endpoints(self, api):
         c, ctx = api
         ctx.market.inject([quote()])
@@ -101,6 +119,63 @@ class TestEndpoints:
         ctx.market.sync_klines([("sh600519", "2026-09-15", 10, 10.2, 10.3, 9.9, 123)])
         k = (await c.get("/api/market/kline", params={"code": "sh600519"})).json()
         assert k["data"][-1]["close"] == 10.2
+        # C013：minute 假参数移除——校验拒放并指向 /market/minute（统一错误模型 400）
+        bad = await c.get("/api/market/kline",
+                          params={"code": "sh600519", "period": "minute"})
+        assert bad.status_code == 400
+        assert bad.json()["code"] == "BAD_REQUEST"
+        bad2 = await c.get("/api/market/kline",
+                           params={"code": "sh600519", "period": "week"})
+        assert bad2.status_code == 400 and bad2.json()["code"] == "BAD_REQUEST"
+
+    async def test_minute_default_date_fallback(self, api):
+        """C018：缺省 date 无行回退最近有数交易日；显式 date 不回退。"""
+        c, ctx = api
+        ctx.market.inject([quote(ts="15:35:00")])  # 推进 trading_date 至 09-16（槽外 ts 不落桶）
+        ctx.store.upsert_minutes([("sh600519", "2026-09-15", "09:31", 10.0, 100)])
+        r = (await c.get("/api/market/minute", params={"code": "sh600519"})).json()
+        assert r["date"] == "2026-09-15" and len(r["data"]) == 1  # 回退到最近有数日
+        r2 = (await c.get("/api/market/minute",
+                          params={"code": "sh600519", "date": "2026-09-14"})).json()
+        assert r2["date"] == "2026-09-14" and r2["data"] == []    # 显式精确查询
+
+    async def test_minute_latest_bootstrap_on_empty(self, api):
+        """C019：缺省回退仍空 → 在线触发最近交易日分时引导；显式 date 不触发。"""
+        c, ctx = api
+
+        class _FakeMinuteSource:
+            def __init__(self):
+                self.calls: list[str] = []
+
+            async def fetch_latest_minutes(self, code):
+                self.calls.append(code)
+                return ("2026-09-18", [
+                    (code, "2026-09-18", "09:30", 10.0, 1000),
+                    (code, "2026-09-18", "09:31", 10.1, 2500),
+                ])
+
+        src = _FakeMinuteSource()
+        ctx.market.inject([quote(ts="15:35:00")])   # trading_date=09-16，不落桶
+        ctx.market._tencent = src
+        r = (await c.get("/api/market/minute", params={"code": "sh600519"})).json()
+        assert r["date"] == "2026-09-18" and len(r["data"]) == 2  # 引导后返回最近交易日
+        assert src.calls == ["sh600519"]
+        assert len(ctx.store.minutes_for("sh600519", "2026-09-18")) == 2  # 已落库
+        # 显式 date 不触发引导
+        r2 = (await c.get("/api/market/minute",
+                          params={"code": "sz000001", "date": "2026-09-14"})).json()
+        assert r2["data"] == [] and src.calls == ["sh600519"]
+        # 无数据空结果 → 冷却，不连续打上游
+        class _EmptySource(_FakeMinuteSource):
+            async def fetch_latest_minutes(self, code):
+                self.calls.append(code)
+                return None
+        empty = _EmptySource()
+        ctx.market._tencent = empty
+        for _ in range(2):
+            r3 = (await c.get("/api/market/minute", params={"code": "sz000001"})).json()
+            assert r3["data"] == []
+        assert empty.calls == ["sz000001"]  # 第二次命中 10 分钟冷却
 
     async def test_plans_and_entries_crud(self, api):
         c, ctx = api

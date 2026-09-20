@@ -15,7 +15,7 @@ import math
 from datetime import datetime
 from typing import Any
 
-from app.domain.engine import board_code
+from app.domain.engine import board_code, tradable_ok
 from app.domain.plan_engine import (
     OrderIntent, apply_fence, check_daily_loss, check_stop, evaluate_entry,
 )
@@ -58,6 +58,14 @@ class PlanService:
         if invalid:
             raise BizError("BAD_CODE", f"标的码格式非法：{', '.join(invalid)}",
                            {"codes": invalid, "reason": "BAD_FORMAT"}, 422)
+        # C015：品种准入白名单（02 §6.1 规则适用范围）——指数/基金/债券/北交所等
+        # 行情可及但撮合规则未覆盖，计划标的池拒收，防错规则静默撮合
+        untradable = [c for c in normalized if not tradable_ok(c)]
+        if untradable:
+            raise BizError("UNSUPPORTED_BOARD",
+                           f"标的不在可交易白名单（仅沪深主板/创业板/科创板个股）："
+                           f"{', '.join(untradable)}",
+                           {"codes": untradable}, 422)
         scope["codes"] = normalized
         plan_id = store.insert_plan(
             trader_id, str(spec.get("name", "计划")),

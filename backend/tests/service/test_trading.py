@@ -104,6 +104,30 @@ class TestValidationChain:
             })
         assert ei.value.code == "SUSPENDED"
 
+    async def test_unsupported_board_rejects_quoted_exotics(self, ctx):
+        """C015：指数/ETF/北交所行情可及但规则未覆盖 → UNSUPPORTED_BOARD。"""
+        tid = await _mk_trader(ctx)
+        await inject(ctx, quote(code="sh000300"), quote(code="sh510300"),
+                     quote(code="bj430047"))
+        for code in ("sh000300", "sh510300", "bj430047"):
+            with pytest.raises(BizError) as ei:
+                await ctx.trading.submit_order(tid, {
+                    "side": "buy", "type": "limit", "code": code,
+                    "price": 10.0, "qty": 100,
+                })
+            assert ei.value.code == "UNSUPPORTED_BOARD", code
+
+    async def test_bare_code_keeps_suspended_semantics(self, ctx):
+        """C015：裸码无行情快照，维持原有 SUSPENDED 语义（白名单在行情检查之后）。"""
+        tid = await _mk_trader(ctx)
+        await inject(ctx, quote())
+        with pytest.raises(BizError) as ei:
+            await ctx.trading.submit_order(tid, {
+                "side": "buy", "type": "limit", "code": "600519",
+                "price": 10.0, "qty": 100,
+            })
+        assert ei.value.code == "SUSPENDED"
+
     async def test_trader_status_rejects(self, ctx):
         tid = await _mk_trader(ctx)
         await inject(ctx, quote())

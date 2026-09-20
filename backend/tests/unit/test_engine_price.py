@@ -2,7 +2,7 @@
 
 from app.domain.engine import (
     BookLevel, Tick, buy_freeze, calc_fee, limit_pct, lot_ok,
-    price_limits, release_freeze, valid_band,
+    price_limits, release_freeze, tradable_ok, valid_band,
 )
 
 
@@ -92,3 +92,32 @@ class TestFreeze:
 
     def test_full_release(self):
         assert release_freeze("buy", 1002.0, 100, 100) == 0.0
+
+
+class TestTradableOk:
+    """C015：品种准入白名单——放行规则已覆盖板块个股，拒指数/基金/北交所/裸码。"""
+
+    def test_whitelist_boards(self):
+        assert tradable_ok("sh600519")   # 沪主板
+        assert tradable_ok("sh601318")
+        assert tradable_ok("sh688981")   # 科创板
+        assert tradable_ok("sz000001")   # 深主板
+        assert tradable_ok("sz002594")
+        assert tradable_ok("sz300750")   # 创业板
+        assert tradable_ok("sz301269")
+
+    def test_reject_index(self):
+        assert not tradable_ok("sh000300")  # 沪深300（指数，裸码前两位同为 00 需前缀判定）
+        assert not tradable_ok("sz399001")  # 深证成指
+
+    def test_reject_fund_bond_bj(self):
+        assert not tradable_ok("sh510300")  # ETF
+        assert not tradable_ok("sz159919")  # ETF
+        assert not tradable_ok("sh113044")  # 可转债
+        assert not tradable_ok("bj430047")  # 北交所（±30%/1 股递增规则未覆盖）
+
+    def test_reject_bare_and_malformed(self):
+        assert not tradable_ok("600519")    # 裸码无市场前缀
+        assert not tradable_ok("sh60")      # 长度不足
+        assert not tradable_ok("sh60051a")  # 非数字
+        assert not tradable_ok("")

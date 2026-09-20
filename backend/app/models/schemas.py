@@ -33,7 +33,7 @@ class OrderIn(BaseModel):
     code: str = Field(min_length=3, max_length=12)
     price: float | None = Field(default=None, gt=0)
     qty: int = Field(gt=0)
-    marketType: Literal["best5_cancel", "opponent_best"] = "best5_cancel"
+    marketType: Literal["best5_cancel", "opponent_best"] | None = None
     clientOrderId: str | None = Field(default=None, max_length=64)
 
 
