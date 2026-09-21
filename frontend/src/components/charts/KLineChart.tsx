@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KlineRow } from '../../api/types'
 import type { KlinePeriod } from '../../state/marketData'
-import { lsGet, lsSet } from '../../lib/storage'
 import {
   boll,
   clampView,
@@ -30,17 +29,6 @@ const MA_STEPS = [5, 10, 20, 60] as const
 type OverlayId = 'ma' | 'ema' | 'boll'
 type SubId = 'vol' | 'macd' | 'rsi' | 'kdj'
 
-const OVERLAY_LABELS: Record<OverlayId, string> = { ma: 'MA', ema: 'EMA', boll: 'BOLL' }
-const SUB_LABELS: Array<[SubId, string]> = [
-  ['vol', 'VOL'],
-  ['macd', 'MACD'],
-  ['rsi', 'RSI'],
-  ['kdj', 'KDJ'],
-]
-
-const OVERLAY_KEY = 'qtv_kline_overlays'
-const SUB_KEY = 'qtv_kline_sub'
-
 /** 图例周期标签（T27-1/D5） */
 const PERIOD_LABELS: Record<KlinePeriod, string> = {
   day: '日K',
@@ -48,30 +36,14 @@ const PERIOD_LABELS: Record<KlinePeriod, string> = {
   month: '月K',
 }
 
-function isOverlayId(v: string | null): v is OverlayId {
-  return v === 'ma' || v === 'ema' || v === 'boll'
-}
-
-function isSubId(v: string | null): v is SubId {
-  return v === 'vol' || v === 'macd' || v === 'rsi' || v === 'kdj'
-}
-
-function loadOverlays(): OverlayId[] {
-  const raw = lsGet(OVERLAY_KEY)
-  if (raw === null) return ['ma']
-  const parsed = raw.split(',').filter(isOverlayId)
-  return parsed
-}
-
-function loadSub(): SubId {
-  const stored = lsGet(SUB_KEY)
-  return isSubId(stored) ? stored : 'vol'
-}
-
 interface KLineChartProps {
   klines: KlineRow[]
   /** 周期（T27-1）：影响图例/日期轴口径与默认副图（分时态不渲染本组件） */
   period?: KlinePeriod
+  /** 副图指标（C021：控件沉底 ca-foot，状态由 ChartArea 持有传入） */
+  sub?: SubId
+  /** 主图叠加集合（C021：控件归位顶栏 ca-bar，状态由 ChartArea 持有传入） */
+  overlays?: OverlayId[]
 }
 
 /**
@@ -81,14 +53,17 @@ interface KLineChartProps {
  * 指标色阶令牌 / 图例（日期+OHLC+涨跌幅+叠加当前值）/ 十字光标 / 仅渲染可见区间。
  * MA 透明度阶梯废止改色相阶梯（§5.1 修订项，浅色对比度修复）。
  */
-export function KLineChart({ klines, period = 'day' }: KLineChartProps) {
+export function KLineChart({
+  klines,
+  period = 'day',
+  sub = 'vol',
+  overlays = ['ma'],
+}: KLineChartProps) {
   const [wrapRef, { width, height }] = useChartSize<HTMLDivElement>()
   const theme = useChartTheme()
   const total = klines.length
   const [view, setView] = useState<ViewWindow>(() => defaultView(total))
   const [cross, setCross] = useState<number | null>(null)
-  const [overlays, setOverlays] = useState<OverlayId[]>(loadOverlays)
-  const [sub, setSub] = useState<SubId>(loadSub)
   const drag = useRef<{ x: number; end: number; moved: boolean } | null>(null)
 
   useEffect(() => {
@@ -175,8 +150,11 @@ export function KLineChart({ klines, period = 'day' }: KLineChartProps) {
           : theme.flat
       : theme.flat
 
-  // 光标根（无光标显最新根，D5）
-  const focusIdx = cross !== null && cross >= start && cross < view.end ? cross : total - 1
+  // 光标根（无光标显最新根，D5；C021⑤：cross < total 守卫防空数据越界）
+  const focusIdx =
+    cross !== null && cross >= start && cross < view.end && cross < total
+      ? cross
+      : total - 1
   const focus = total > 0 ? klines[focusIdx] : null
   const focusPrev = focusIdx > 0 ? klines[focusIdx - 1].close : null
   const focusPct =
@@ -184,19 +162,6 @@ export function KLineChart({ klines, period = 'day' }: KLineChartProps) {
 
   const maColor = (n: number): string =>
     n === 5 ? theme.ind1 : n === 10 ? theme.ind2 : n === 20 ? theme.ind3 : theme.ind5
-
-  const toggleOverlay = (id: OverlayId) => {
-    setOverlays((cur) => {
-      const next = cur.includes(id) ? cur.filter((v) => v !== id) : [...cur, id]
-      lsSet(OVERLAY_KEY, next.join(','))
-      return next
-    })
-  }
-
-  const pickSub = (id: SubId) => {
-    setSub(id)
-    lsSet(SUB_KEY, id)
-  }
 
   const toIndex = (clientX: number): number => {
     const rect = wrapRef.current?.getBoundingClientRect()
@@ -234,22 +199,6 @@ export function KLineChart({ klines, period = 'day' }: KLineChartProps) {
         setCross(null)
       }}
     >
-      {/* 主图叠加胶丸（顶栏第二胶丸组，可同开） */}
-      <div className="kline-pills kline-pills-overlay" data-testid="kline-overlay-pills">
-        {(Object.keys(OVERLAY_LABELS) as OverlayId[]).map((id) => (
-          <button
-            key={id}
-            type="button"
-            className={`pill ${overlays.includes(id) ? 'active' : ''}`}
-            aria-label={OVERLAY_LABELS[id]}
-            aria-pressed={overlays.includes(id)}
-            onClick={() => toggleOverlay(id)}
-          >
-            {OVERLAY_LABELS[id]}
-          </button>
-        ))}
-      </div>
-
       {width > 0 && height > 0 && (
         <svg width={width} height={height} className="chart-svg">
           {/* 图例（D5）：主图左上 = 日期 + OHLC + 涨跌幅 + 叠加当前值；无光标显最新根 */}
@@ -602,8 +551,8 @@ export function KLineChart({ klines, period = 'day' }: KLineChartProps) {
             ))
           })()}
 
-          {/* 十字光标 */}
-          {cross !== null && cross >= start && cross < view.end && (
+          {/* 十字光标（C021⑤：空数据越界守卫——cross < total） */}
+          {cross !== null && cross >= start && cross < view.end && cross < total && (
             <g>
               <line x1={x(cross - start)} x2={x(cross - start)} y1={PAD_T} y2={PAD_T + plotH} stroke={theme.crosshair} strokeDasharray="3 3" />
               <line x1={PAD_L} x2={width - PAD_R} y1={y(klines[cross].close)} y2={y(klines[cross].close)} stroke={theme.crosshair} strokeDasharray="3 3" />
@@ -611,22 +560,6 @@ export function KLineChart({ klines, period = 'day' }: KLineChartProps) {
           )}
         </svg>
       )}
-
-      {/* 副图胶丸（副图右上、半透明底、贴被控对象） */}
-      <div className="kline-pills kline-pills-sub" data-testid="kline-sub-pills">
-        {SUB_LABELS.map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={`pill ${sub === id ? 'active' : ''}`}
-            aria-label={label}
-            aria-pressed={sub === id}
-            onClick={() => pickSub(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }

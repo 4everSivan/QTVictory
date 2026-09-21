@@ -15,6 +15,7 @@
 ---
 
 ### 变更 (Changed)
+- **K线分析工具布局归位**（[C021](docs/devel/change/C021-K线工具布局修正.md)）：M18 落地后控件位置修正——MA/EMA/BOLL 叠加开关归位顶栏第二胶丸组（D4 口径）、VOL/MACD/RSI/KDJ 副图胶丸沉底为图表区底部胶丸组与顶栏上下对称（用户拍板，修订 D2 口径）、图例补周期标签；附带修复空数据 + 光标路径越界崩溃。详见变更卡 [C021](docs/devel/change/C021-K线工具布局修正.md)。
 - **K线分析工具（多周期K线数据底座 + 前端图表）**（里程碑 [M18](docs/devel/plan/M18-K线分析工具.md)，任务 T25/T26/T27，来源 FT-0009）：后端冷热双态 bar 模型——`kline_view` 冷热合成（klines 完结冷序列 ∪ 当日热 bar，降级缺 OHLC/停牌诚实少一根不造假）、换日捕获自沉淀（源门禁：tencent/sina 必落、eastmoney 视 OHLC、anchor 恒不落，幂等可重入）、校准重拉深度 ≥ 库存深度、日K引导深度 320 → 800 可配（`QTV_KLINE_DEPTH`，单源失败回落 320）；week/month 纯函数聚合（ISO 自然周/自然月，OHLCV 归约，date 取 period 末交易日，不落表不缓存），`GET /market/kline` period 枚举放行 `day|week|month`（limit = 聚合后根数，C013 移除的 minute 假参数保持拒绝）。前端四周期 Tab（分时｜日K｜周K｜月K）、单副图槽位 VOL｜MACD｜RSI｜KDJ、主图叠加 MA｜EMA｜BOLL、图例与指标色阶令牌（ind3/ind4/ind5）、`ema/macd/rsiWilder/boll/kdj` 纯函数 + golden vectors 单测锚定；§5.1 MA 透明度阶梯废止改色相阶梯。详见 02 §3.11（v7.0 转正）、01 §5.5（v6.0 转正）。
 - **品种准入白名单（UNSUPPORTED_BOARD）**：撮合/下单/计划仅覆盖沪深主板/创业板/科创板个股；指数/基金/债券/北交所等行情可及品种下单 400、计划创建 422 `UNSUPPORTED_BOARD` 拒单；前端 errors 映射 field 级文案。详见变更卡 [C015](docs/devel/change/C015-品种准入白名单.md)。
 - **最近交易日分时引导**：`/api/market/minute` 缺省查询经回退仍无数据时，在线触发腾讯 `app/day/query` 拉取**最近一个交易日**全量分时（242 点，与实时落桶同时段门禁与量纲，失败 10 分钟冷却）幂等落库并返回——周末/非交易时段选中标的即可见最近交易日完整分时；Q8"历史分钟不回补"边界修订为仅放行最近交易日单日引导（2026-09-20 会话拍板）。详见变更卡 [C019](docs/devel/change/C019-最近交易日分时引导.md)。

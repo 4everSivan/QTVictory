@@ -23,6 +23,24 @@ describe('ChartArea 周期 Tab（01 §5.5 D1，T27-1）', () => {
     }
   })
 
+  it('C021①：叠加胶丸归位顶栏 ca-bar（第二胶丸组，不再浮于主图）', () => {
+    render(<ChartArea code="600519" quote={quote} />)
+    const bar = document.querySelector('.ca-bar')
+    for (const name of ['MA', 'EMA', 'BOLL']) {
+      expect(bar?.querySelector(`[aria-label="${name}"]`)).toBeTruthy()
+    }
+    expect(document.querySelector('[data-testid="kline-chart"] [aria-label="MA"]')).toBeNull()
+  })
+
+  it('C021②：副图胶丸沉底 ca-foot，与顶栏上下对称', () => {
+    render(<ChartArea code="600519" quote={quote} />)
+    const foot = document.querySelector('.ca-foot')
+    for (const name of ['VOL', 'MACD', 'RSI', 'KDJ']) {
+      expect(foot?.querySelector(`[aria-label="${name}"]`)).toBeTruthy()
+    }
+    expect(document.querySelector('[data-testid="kline-chart"] [aria-label="VOL"]')).toBeNull()
+  })
+
   it('点周K：缺缓存时按 period=week 拉取并渲染 K 线', async () => {
     const spy = vi.spyOn(api, 'get').mockResolvedValue({
       code: '600519', period: 'week', data: [],
