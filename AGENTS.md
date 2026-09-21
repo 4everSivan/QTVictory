@@ -10,10 +10,11 @@
 4. **CHANGELOG 同步**：核验通过的 C 卡按 semver 记账（规则见 [docs/README.md](docs/README.md) §3.3），CHANGELOG 条目与 C 卡双向互链。
 5. **元数据契约**：文档头部引用块 `**键名**: 值 ｜ 键值`——半角冒号加单空格、全角竖线分隔、状态枚举纯净（禁括号小尾巴）、日期 ISO `YYYY-MM-DD`。
 6. **锚点纪律**：章节号只增不插中间；废弃章节原位保留并标注 `[已废弃]`，编号不复用。
+7. **治理流收口回调**：每次 change / design 治理链路走完（含收口、双向回写闭环、tag 打出）后，必须回调 `scripts/jev_workflow_check.py` 做治理状态自检，输出作为该链路的收口证据；自检判为"存在治理违规"时不得合入主干。
 
 ## 入口流程
 
-两类工作各走一条链路，共同遵守：文档先行 → 开发 → 测试 → 验收，每步产出落在对应目录，不跨步、不省略。
+两类工作各走一条链路，共同遵守：文档先行 → 开发 → 测试 → 验收 → 治理自检，每步产出落在对应目录，不跨步、不省略。
 
 ### 功能设计入口（新功能 / 新 Phase 立项）
 
@@ -23,7 +24,7 @@
 4. **开发**：按 T 卡范围与 DoD 执行，不超范围。
 5. **测试**：跑下方"测试命令"全部适用项，结果写入验收材料。
 6. **验收**：在 `docs/devel/report/` 新建验收报告（结论枚举：通过 / 受限通过 / 未通过）。
-7. **收口**：验收通过的 T 卡冻结为只读；按 §3.3 同步 `CHANGELOG` 与版本号，打对应 `git tag`。
+7. **收口**：验收通过的 T 卡冻结为只读；按 §3.3 同步 `CHANGELOG` 与版本号，打对应 `git tag`；**回调 `scripts/jev_workflow_check.py` 做治理状态自检，输出留作收口证据（红线 7）**。
 
 ### Bug 修复入口（缺陷 / 功能回调 / 参数调整）
 
@@ -33,7 +34,7 @@
 4. **同步 design**：涉及设计规则时修订 `docs/devel/design/` 对应章节（红线 3）。
 5. **对齐核验与收尾**：AI 执行测试与实测后在会话中向人工汇报核验事实；人工确认后，AI 代为在卡内签署收口（记录会话确认依据），卡状态由 `待核验` 转为 `核验通过` / `核验驳回`，无需人工手动改写文档。
 6. **合入**：核验通过后才允许合入主干。
-7. **双向回写闭环**：design 对应章节原位增补回链提示、文末变更记录增补条目回链 C 编号、头部"关联变更"追加；按 §3.3 记 `CHANGELOG`（双向互链）、需要时打 `git tag`。
+7. **双向回写闭环**：design 对应章节原位增补回链提示、文末变更记录增补条目回链 C 编号、头部"关联变更"追加；按 §3.3 记 `CHANGELOG`（双向互链）、需要时打 `git tag`；**回调 `scripts/jev_workflow_check.py` 做治理状态自检，输出留作闭环证据（红线 7）**。
 
 细则与状态枚举：变更卡见 [docs/devel/change/README.md](docs/devel/change/README.md)；六类目录契约见 [docs/README.md](docs/README.md) §3。
 
@@ -42,6 +43,20 @@
 - 后端：`cd backend && pytest`
 - 前端：`cd frontend && npm test`（Vitest 单测）+ `npm run build`（tsc + Vite 构建）
 - E2E：`node frontend/scripts/e2e.mjs`（Playwright 无头几何验收）
+
+## 治理自检（收口必跑）
+
+每次 change / design 治理链路走完（含收口、双向回写闭环、tag 打出）后，必须回调治理自检脚本，输出作为该链路的收口证据之一：
+
+```
+python3 scripts/jev_workflow_check.py
+```
+
+- **Key 获取**：脚本自动读 `~/.config/typesafe/credentials.env`（可用 `TYPESAFE_CREDENTIALS_FILE` 覆盖），也可用 `--api-key` 或 `TYPESAFE_API_KEY` 环境变量；key 值严禁写入仓库或打印到输出。
+- **无 key 时的降级**：脚本只打印采集事实并返回 exit 2，此时链路仍须人工确认收口，不得视为已完成自检。
+- **违规即阻断**：脚本判为"存在治理违规"时，该链路不得合入主干，先修复违规再重跑。
+- **低置信需人工复核**：任一判定置信低于 0.60 会标注 ⚠，此时结论仅供参考，须人工核对采集事实后决策。
+- 只采集状态、不调用模型：`python3 scripts/jev_workflow_check.py --offline`。
 
 ## 测试环境（隔离红线）
 
@@ -58,4 +73,5 @@
 - 变更核验：`docs/devel/change/`
 - 验收证据：`docs/devel/report/`（全量归档）、`docs/devel/assessment/`（仅归档评分报告，评分规则常驻；版本 tag 后按 [docs/archive/README.md](docs/archive/README.md) SOP 归档）
 - 部署运维：`docs/guide/`（01 单机部署运维 / 02 测试环境部署）
+- 治理自检脚本：`scripts/jev_workflow_check.py`（收口必跑，见"治理自检"节）
 
