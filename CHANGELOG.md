@@ -15,6 +15,7 @@
 ---
 
 ### 变更 (Changed)
+- **接入 GitHub Actions 自动化流水线**（[C025](docs/devel/change/C025-接入GitHub_Actions自动化流水线.md)）：引入云端自动化 CI/CD 工作流（`.github/workflows/ci.yml`），覆盖后端单测（226 项）、治理脚本单测（157 项）、前端 Vitest 单测（180 项）、前端构建（TypeScript + Vite）、E2E 浏览器几何校验（37 项）以及文档治理离线硬判（`scripts/jev_workflow_check.py --offline`）与在线 Jev 语义模型自检门禁。详见变更卡 [C025](docs/devel/change/C025-接入GitHub_Actions自动化流水线.md)。
 - **优化顶栏K线叠加工具位置与间距**（[C022](docs/devel/change/C022-优化顶栏K线叠加工具位置与间距.md)）：顶栏图表栏新增 `.ca-bar-left` 容器将周期 Tab（`分时｜日K｜周K｜月K`）与主图叠加胶丸（`MA｜EMA｜BOLL`）居左成组，叠加胶丸紧随月K右侧保持 12px 舒适间距，消除原 `justify-content: space-between` 导致工具胶丸居中漂移脱节的问题。详见变更卡 [C022](docs/devel/change/C022-优化顶栏K线叠加工具位置与间距.md)。
 - **K线分析工具布局归位**（[C021](docs/devel/change/C021-K线工具布局修正.md)）：M18 落地后控件位置修正——MA/EMA/BOLL 叠加开关归位顶栏第二胶丸组（D4 口径）、VOL/MACD/RSI/KDJ 副图胶丸沉底为图表区底部胶丸组与顶栏上下对称（用户拍板，修订 D2 口径）、图例补周期标签；附带修复空数据 + 光标路径越界崩溃。详见变更卡 [C021](docs/devel/change/C021-K线工具布局修正.md)。
 - **K线分析工具（多周期K线数据底座 + 前端图表）**（里程碑 [M18](docs/devel/plan/M18-K线分析工具.md)，任务 T25/T26/T27，来源 FT-0009）：后端冷热双态 bar 模型——`kline_view` 冷热合成（klines 完结冷序列 ∪ 当日热 bar，降级缺 OHLC/停牌诚实少一根不造假）、换日捕获自沉淀（源门禁：tencent/sina 必落、eastmoney 视 OHLC、anchor 恒不落，幂等可重入）、校准重拉深度 ≥ 库存深度、日K引导深度 320 → 800 可配（`QTV_KLINE_DEPTH`，单源失败回落 320）；week/month 纯函数聚合（ISO 自然周/自然月，OHLCV 归约，date 取 period 末交易日，不落表不缓存），`GET /market/kline` period 枚举放行 `day|week|month`（limit = 聚合后根数，C013 移除的 minute 假参数保持拒绝）。前端四周期 Tab（分时｜日K｜周K｜月K）、单副图槽位 VOL｜MACD｜RSI｜KDJ、主图叠加 MA｜EMA｜BOLL、图例与指标色阶令牌（ind3/ind4/ind5）、`ema/macd/rsiWilder/boll/kdj` 纯函数 + golden vectors 单测锚定；§5.1 MA 透明度阶梯废止改色相阶梯。详见 02 §3.11（v7.0 转正）、01 §5.5（v6.0 转正）。
