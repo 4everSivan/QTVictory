@@ -16,6 +16,12 @@
   border-bottom: 1px solid var(--line);
 }
 
+.ca-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .ca-tabs {
   display: flex;
   gap: 4px;

@@ -93,37 +93,39 @@ export function ChartArea({ code, quote }: ChartAreaProps) {
   return (
     <div className="chart-area" data-testid="chart-area">
       <div className="ca-bar">
-        <div className="ca-tabs" role="tablist">
-          {TABS.map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={tab === key}
-              className={`ca-tab ${tab === key ? 'active' : ''}`}
-              onClick={() => {
-                setTab(key)
-                if (key !== 'minute') saveKlinePeriod(key)
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {/* 顶栏第二胶丸组（D4）：主图叠加独立开关，可同开 */}
-        <div className="ca-overlays" data-testid="kline-overlay-pills">
-          {OVERLAY_LABELS.map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`pill ${overlays.includes(id) ? 'active' : ''}`}
-              aria-label={label}
-              aria-pressed={overlays.includes(id)}
-              onClick={() => toggleOverlay(id)}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="ca-bar-left">
+          <div className="ca-tabs" role="tablist">
+            {TABS.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                className={`ca-tab ${tab === key ? 'active' : ''}`}
+                onClick={() => {
+                  setTab(key)
+                  if (key !== 'minute') saveKlinePeriod(key)
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* 顶栏第二胶丸组（D4，C022 优化：紧随月K右侧并保持 12px 适度间距）：主图叠加独立开关，可同开 */}
+          <div className="ca-overlays" data-testid="kline-overlay-pills">
+            {OVERLAY_LABELS.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`pill ${overlays.includes(id) ? 'active' : ''}`}
+                aria-label={label}
+                aria-pressed={overlays.includes(id)}
+                onClick={() => toggleOverlay(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <span className="micro-label ca-hint">滚轮缩放 · 拖拽平移 · 双击复位</span>
       </div>

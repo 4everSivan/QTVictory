@@ -32,6 +32,18 @@ describe('ChartArea 周期 Tab（01 §5.5 D1，T27-1）', () => {
     expect(document.querySelector('[data-testid="kline-chart"] [aria-label="MA"]')).toBeNull()
   })
 
+  it('C022：顶栏 ca-bar-left 容器包裹周期 Tab 与叠加胶丸（MA/EMA/BOLL 紧随月K右侧居左成组）', () => {
+    render(<ChartArea code="600519" quote={quote} />)
+    const barLeft = document.querySelector('.ca-bar .ca-bar-left')
+    expect(barLeft).not.toBeNull()
+    const tabs = barLeft?.querySelector('.ca-tabs')
+    const overlays = barLeft?.querySelector('[data-testid="kline-overlay-pills"]')
+    expect(tabs).not.toBeNull()
+    expect(overlays).not.toBeNull()
+    // 验证相对 DOM 顺序：ca-tabs 在前，ca-overlays 紧随其后
+    expect(tabs?.nextElementSibling).toBe(overlays)
+  })
+
   it('C021②：副图胶丸沉底 ca-foot，与顶栏上下对称', () => {
     render(<ChartArea code="600519" quote={quote} />)
     const foot = document.querySelector('.ca-foot')
