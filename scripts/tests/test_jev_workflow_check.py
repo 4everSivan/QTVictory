@@ -1,6 +1,6 @@
 """scripts/jev_workflow_check.py 的回归测试。
 
-覆盖 C023 修复的六类缺陷，每一类都对应一个曾经真实发生过的失效模式：
+覆盖 C023 / C024 修复的缺陷，每一类都对应一个曾经真实发生过的失效模式：
   1. 流转账本复合记录错配 / 漏记（EN-0002 整条消失、EN-0003 错配到 C002）
   5. cross_check 缺失导致阶段判定与代码事实矛盾时可静默放行
   6. call_jev 三类异常逃逸成 exit 1
@@ -13,6 +13,11 @@
      「不确定」而结论行写「仍有同步点缺失」，同一份概率两层给出相反定性
   11. 不确定带 ±0.15 对模型噪声过窄：同输入实跑 P=0.33~0.42 横跨下沿，
      干净仓库被误拦 exit 4，而真实违规仅 P=0.06，两侧本有空档可切
+  12. cross_check 把 awaiting_bidirectional_sync 的放行权绑在 unmerged_cards
+     非空上：全部卡合入后 expected 退化为 idle，Jev 对同步闭环的低置信猜疑反被
+     升级成 exit 4——而 unmerged_cards 为空正是每次正常收口后的必经路径，等于
+     每个干净检查点都被误拦一次（改为无条件放行；真实未闭环由 sync_complete
+     noul 门禁与 compliance 档位闸独立兜住，不依赖本放行集）
 
 运行：python3 -m pytest scripts/tests -q
 """
@@ -412,8 +417,10 @@ class TestCrossCheck:
         assert jwc.cross_check({}, _state()) == []
         assert jwc.cross_check({"answers": {}}, _state()) == []
 
+    # awaiting_bidirectional_sync 不在此列：同步闭环是代码侧无法否证的语义判断，
+    # C024 起无条件放行（见 cross_check 注释），有无待核验卡都不影响。
     @pytest.mark.parametrize("stage", [
-        "idle", "awaiting_bidirectional_sync", "awaiting_merge_or_release"])
+        "idle", "awaiting_merge_or_release"])
     def test_pending_card_contradicts_stage(self, stage):
         st = _state(code_assertions=_empty_assertions(pending_cards=["C023"]))
         r = _good_response()
@@ -422,7 +429,8 @@ class TestCrossCheck:
         assert len(reasons) == 1
         assert "C023" in reasons[0]
 
-    @pytest.mark.parametrize("stage", ["awaiting_verification", "has_violation"])
+    @pytest.mark.parametrize(
+        "stage", ["awaiting_verification", "awaiting_bidirectional_sync", "has_violation"])
     def test_pending_card_consistent_stage(self, stage):
         st = _state(code_assertions=_empty_assertions(pending_cards=["C023"]))
         r = _good_response()
@@ -476,6 +484,33 @@ class TestCrossCheck:
 
     def test_all_merged_expects_idle(self):
         assert jwc.expected_stage(_empty_assertions()) == "idle"
+
+    def test_all_closed_state_allows_sync_suspicion(self):
+        """缺陷 22（C024）：全部卡已合入时 expected 退化为 idle，而同步闭环是代码侧
+        两个方向都裁不了的语义判断（design 原位回链 / 头部关联变更 / CHANGELOG 互链
+        都要读正文才能确认）。一旦因为 unmerged_cards 为空就不放行该标签，Jev 对同步
+        闭环的低置信猜疑就会被升级成 exit 4 硬违规——而 unmerged_cards 为空正是每次
+        正常收口后的必经路径，等于每个干净检查点都会被误拦一次。干净检查点被拦会训练
+        运营者忽略退出码，这比漏拦更危险。真实未闭环仍由 sync_complete noul 门禁与
+        compliance 档位闸独立兜住，不依赖本放行集。"""
+        st = _state()
+        assert jwc.expected_stage(st["current_state"]["code_assertions"]) == "idle"
+        r = _good_response()
+        r["answers"]["current_stage"]["choice"] = "awaiting_bidirectional_sync"
+        assert jwc.cross_check(r, st) == []
+        assert jwc.detect_violation(r, st) == []
+
+    @pytest.mark.parametrize(
+        "stage", ["awaiting_verification", "awaiting_merge_or_release"])
+    def test_no_open_step_contradicts_stage(self, stage):
+        """放行 awaiting_bidirectional_sync 不等于放开其余标签：没有任何未完成
+        步骤却判成还在等核验 / 等合入，仍是代码侧能否证的矛盾，必须继续拦。"""
+        st = _state()
+        r = _good_response()
+        r["answers"]["current_stage"]["choice"] = stage
+        reasons = jwc.cross_check(r, st)
+        assert len(reasons) == 1
+        assert jwc.STAGE_LABELS[stage] in reasons[0]
 
     def test_stage_facts_names_the_driving_evidence(self):
         text = jwc._stage_facts(_empty_assertions(
@@ -722,6 +757,18 @@ class TestMainExitCodes:
         body = json.dumps(_good_response()).encode("utf-8")
         _patch_urlopen(monkeypatch, lambda *a, **k: _FakeResp(body))
         assert _run_main(monkeypatch, [], st) == 4
+    def test_idle_state_allows_sync_suspicion(self, monkeypatch, tmp_path):
+        """缺陷 22（C024）的端到端回归：全部卡已合入、Jev 对同步闭环猜疑，
+        曾经会被 cross_check 升级成 exit 4——而这正是每次正常收口后的必经路径。
+        必须 exit 0：真实未闭环由 sync_complete noul 门禁独立兜住。"""
+        st = _state()
+        st["_repo"] = tmp_path
+        monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+        r = _good_response()
+        r["answers"]["current_stage"]["choice"] = "awaiting_bidirectional_sync"
+        body = json.dumps(r).encode("utf-8")
+        _patch_urlopen(monkeypatch, lambda *a, **k: _FakeResp(body))
+        assert _run_main(monkeypatch, [], st) == 0
 
     def test_low_confidence_exits_six(self, monkeypatch, tmp_path, capsys):
         """合规档位低于阈值但置信不足：不硬拦（exit 4），也不算通过，

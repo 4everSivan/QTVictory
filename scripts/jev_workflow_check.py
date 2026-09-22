@@ -991,6 +991,12 @@ def cross_check(resp: dict, state: dict) -> list:
     事实各设一条允许集——后者在「待核验 + 已核验未合入」并存时会自相矛盾
     （详见 expected_stage 注释）。
 
+    放行集 = {expected, has_violation, awaiting_bidirectional_sync}。后两者属
+    「代码侧无法否证」：模型判出代码侧没发现的违规时不得反被本校验拦（方向从
+    严）；同步是否闭环同样是语义判断，代码侧两个方向都裁不了，故无条件放行，
+    不随 unmerged_cards 是否为空而收紧。其余三个标签仍由 pending_cards /
+    unmerged_cards 约束。
+
     sediment_violations 与非法枚举两类不在此重复：代码侧已在 detect_violation
     直接产出理由。resp 为空（--offline）或缺 current_stage 时无从交叉校验，
     直接返回空列表，交由代码侧理由兜底。
@@ -1001,11 +1007,16 @@ def cross_check(resp: dict, state: dict) -> list:
         return []
     ca = state["current_state"]["code_assertions"]
     expected = expected_stage(ca)
-    allowed = {expected, "has_violation"}
+    # awaiting_bidirectional_sync 与 has_violation 同属「代码侧无法否证」的标签：
     # 同步是否闭环是语义判断（design 原位回链 / 头部关联变更 / CHANGELOG 互链都要
-    # 读正文），代码侧无法裁定，故已核验未合入态下额外放行 awaiting_bidirectional_sync。
-    if ca["unmerged_cards"]:
-        allowed.add("awaiting_bidirectional_sync")
+    # 读正文才能确认），代码侧两个方向都裁不了，故无条件放行。
+    # 曾经的写法是仅当 unmerged_cards 非空才放行——那会造成反向漏洞：所有卡都已
+    # 合入（expected 退化为 idle）时它反而不被放行，Jev 一旦对同步闭环猜疑就被升级
+    # 成 exit 4 硬违规。而 unmerged_cards 为空正是每次正常收口后的必经路径，等于每个
+    # 干净检查点都会被误拦一次——干净检查点被拦会训练运营者忽略退出码，这比漏拦更
+    # 危险。真实未闭环仍由 sync_complete noul 门禁与 compliance 档位闸独立兜住，
+    # 不依赖本放行集。
+    allowed = {expected, "has_violation", "awaiting_bidirectional_sync"}
     if stage in allowed:
         return []
     return [
