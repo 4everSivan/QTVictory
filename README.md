@@ -5,7 +5,7 @@
 > **当前交付状态**：**Phase 1「模拟底座与观察员控制台」全链路收口完成**。  
 > - **后端底座**：已通过 [M8 验收报告](docs/devel/report/01-M8-验收报告.md)（226 项测试全绿，四项高频性能指标全面达标，支持冷热合成双态 bar 模型与四级行情降级自愈链）；  
 > - **Web 控制台**：已按 [01 前端设计方案](docs/devel/design/01-前端设计方案.md) 落地 Nothing 设计系统并通过 [M16 前端验收报告](docs/devel/report/02-M16-前端验收报告.md)、[M17 自选股编辑验收报告](docs/devel/report/03-M17-自选股编辑验收报告.md) 与 [M18 K线分析工具验收报告](docs/devel/report/04-M18-K线分析工具验收报告.md)（180 项 Vitest 单测全绿 + 浏览器几何验收 37 项通过，支持四周期与指标体系）；  
-> - **维护期治理**：累计完成 [C001–C025](docs/devel/change/README.md) 共 25 张变更核验卡闭环，严格执行 TypeSafe / Jev 工作流自检与零沉淀纪律，全库工程文档形成双向互链闭环。
+> - **维护期治理**：累计完成 [C001–C026](docs/devel/change/README.md) 共 26 张变更核验卡闭环，严格执行 TypeSafe / Jev 工作流自检与零沉淀纪律，全库工程文档形成双向互链闭环。
 
 ---
 
@@ -153,7 +153,7 @@ QTVictory 致力于打通“**信息感知 → 策略模拟演练 → 周期自�
 
 | 阶段 | 阶段定位与核心范围 | 架构对应模块与就位状态 |
 |---|---|---|
-| **Phase 1 · 模拟底座与控制台**<br>*(当前阶段 · 现行交付基线)* | **实时前向仿真底座**：<br>- 真实行情轮询与四级降级自愈链；<br>- A 股规则级撮合引擎（五档盘口/量约束/价格笼子/T+1）；<br>- 观察员-交易员体系与 8 类基准策略；<br>- 计划引擎（四类条件单与四道风控围栏）；<br>- REST + WebSocket 通信与全量审计日志；<br>- Nothing 设计系统单屏监控 Web 控制台（四周期 K 线与指标分析工具、自选股编辑、三态主题）。 | **【✅ 生产就绪 / 已收口】**<br>- 后端：[02 设计方案](docs/devel/design/02-后端设计方案.md) 全量实现，[M8 终验通过](docs/devel/report/01-M8-验收报告.md)（226 项测试全绿）；<br>- 前端：[01 设计方案](docs/devel/design/01-前端设计方案.md) 全量实现，[M16 前端终验](docs/devel/report/02-M16-前端验收报告.md)、[M17 自选股编辑终验](docs/devel/report/03-M17-自选股编辑验收报告.md) 与 [M18 K线分析工具终验](docs/devel/report/04-M18-K线分析工具验收报告.md) 全部通过（180 单测全绿 + 37 项 E2E 几何与交互验收通过）；<br>- 维护：建立 C 卡修复体系（[C001–C025](docs/devel/change/README.md) 25 张变更卡已全量闭环并通过 Jev 自检）。 |
+| **Phase 1 · 模拟底座与控制台**<br>*(当前阶段 · 现行交付基线)* | **实时前向仿真底座**：<br>- 真实行情轮询与四级降级自愈链；<br>- A 股规则级撮合引擎（五档盘口/量约束/价格笼子/T+1）；<br>- 观察员-交易员体系与 8 类基准策略；<br>- 计划引擎（四类条件单与四道风控围栏）；<br>- REST + WebSocket 通信与全量审计日志；<br>- Nothing 设计系统单屏监控 Web 控制台（四周期 K 线与指标分析工具、自选股编辑、三态主题）。 | **【✅ 生产就绪 / 已收口】**<br>- 后端：[02 设计方案](docs/devel/design/02-后端设计方案.md) 全量实现，[M8 终验通过](docs/devel/report/01-M8-验收报告.md)（226 项测试全绿）；<br>- 前端：[01 设计方案](docs/devel/design/01-前端设计方案.md) 全量实现，[M16 前端终验](docs/devel/report/02-M16-前端验收报告.md)、[M17 自选股编辑终验](docs/devel/report/03-M17-自选股编辑验收报告.md) 与 [M18 K线分析工具终验](docs/devel/report/04-M18-K线分析工具验收报告.md) 全部通过（180 单测全绿 + 37 项 E2E 几何与交互验收通过）；<br>- 维护：建立 C 卡修复体系（[C001–C026](docs/devel/change/README.md) 26 张变更卡已全量闭环并通过 Jev 自检）。 |
 | **Phase 2 · 周期自适应奖励系统**<br>*(下一阶段 · 规划中)* | **策略多维科学评价引擎**：<br>- 解耦微观执行层考核（计划外滑点/价格笼子拦截/风控违规）与宏观周期绩效层考核；<br>- 短线（净收益期望/胜率/最大单笔亏损）、波段（盈亏比/卡玛比率）、长线（Alpha/信息比率）差异化指标矩阵；<br>- 小样本置信度检验（p-value 门槛），防范噪声与死扛不平仓偏差。 | **【📋 待立项 / FT-0005】**<br>- 宏观设计已定稿（见 [00 方案 §3.2](docs/devel/design/00-宏观架构与演进设计方案.md#32-周期自适应奖励系统phase-2-核心)）；<br>- 待在 Phase 2 立项后新建 M/T 卡启动开发。 |
 | **Phase 3 · 策略深度分析与回测平台**<br>*(后续阶段 · 规划中)* | **离线回测与策略调优平台**：<br>- 全市场历史 Bar / Tick 数据泵驱动器；<br>- 100% 复用 Phase 1 的纯函数 `MatchingEngine` 内核进行离线事件驱动回测；<br>- 实现偏差归因（Implementation Shortfall），剥离执行损耗与理论 Alpha；<br>- 策略参数网格搜索与稳健高原（Robust Plateau）寻优，防范过拟合。 | **【📋 规划中 / FT-0006】**<br>- 宏观设计已定稿（见 [00 方案 §3.3](docs/devel/design/00-宏观架构与演进设计方案.md#33-策略分析优化与回测平台phase-3-核心)）；<br>- 领域层撮合与计划内核已设计为纯函数无 I/O，已预留脱离网络由历史流驱动的扩展能力。 |
 | **Phase 4 · 金融信息与舆情感知中枢**<br>*(后续阶段 · 规划中)* | **外生信息感知与负向排雷风控**：<br>- 多源研报、财报与财经快讯数据清洗接入；<br>- 负向排雷门禁（业绩暴雷/立案调查/重组失败），输出硬阻断清单直连计划引擎；<br>- 宏观市场状态识别（Regime Detection），输出高波震荡/单边主升等全局标签指导策略启停。 | **【📋 规划中 / FT-0007】**<br>- 宏观设计已定稿（见 [00 方案 §3.4](docs/devel/design/00-宏观架构与演进设计方案.md#34-金融信息感知与舆情排雷中枢phase-4-核心)）；<br>- 坚持“信息做减法”原则，避免大模型直接黑盒预测涨跌。 |
@@ -221,7 +221,7 @@ QTVictory 建立了极为严格的**文档先行（Documentation-First）**与**
 | [**`CHANGELOG.md`**](CHANGELOG.md) | 遵循 Keep a Changelog 与 SemVer 2.0 规范的版本日志 | 持续记账 |
 | [**`docs/README.md`**](docs/README.md) | 全局文档体系总纲、七大目录元数据契约与双向回写规范 | 现行总纲 |
 | [**`docs/devel/design/`**](docs/devel/design/) | 系统事实源：包含 [00-宏观架构与演进方案](docs/devel/design/00-宏观架构与演进设计方案.md)、[01-前端设计方案](docs/devel/design/01-前端设计方案.md)（v6.2） 与 [02-后端设计方案](docs/devel/design/02-后端设计方案.md)（v7.0） | 现行活基线 |
-| [**`docs/devel/change/`**](docs/devel/change/) | 维护期变更核验卡池：包含 [C001–C025](docs/devel/change/README.md) 与 [卡片模板](docs/devel/change/template.md) | 持续登记（25张已闭环） |
+| [**`docs/devel/change/`**](docs/devel/change/) | 维护期变更核验卡池：包含 [C001–C026](docs/devel/change/README.md) 与 [卡片模板](docs/devel/change/template.md) | 持续登记（26张已闭环） |
 | [**`docs/devel/todo/`**](docs/devel/todo/) | 待办与需求缓冲池：包含 [now.md](docs/devel/todo/now.md)（当前）与 [future.md](docs/devel/todo/future.md)（远期） | 落地即移出 |
 | [**`docs/devel/plan/`**](docs/devel/plan/) | Phase 1 里程碑计划（M1–M18，含 M17 自选股编辑、M18 K线分析工具），Phase 1 已整体收口冻结 | 只读封存 |
 | [**`docs/devel/task/`**](docs/devel/task/) | Phase 1 执行任务卡（T01–T27），Phase 1 已整体收口冻结 | 只读封存 |

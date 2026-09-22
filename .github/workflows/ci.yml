@@ -121,5 +121,14 @@ jobs:
           done
 
       - name: Run Playwright E2E Geometric & Interaction Verification (37 passed)
+        env:
+          QTV_PORT: 8788
+          VITE_API_BASE: http://127.0.0.1:8788/api
         run: |
-          QTV_PORT=8788 node frontend/scripts/e2e.mjs
+          node frontend/scripts/e2e.mjs
+
+      - name: Dump Backend logs on failure
+        if: failure()
+        run: |
+          cat /tmp/backend-test.log || true
+

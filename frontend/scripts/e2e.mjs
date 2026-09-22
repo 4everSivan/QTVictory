@@ -26,13 +26,20 @@ function check(name, cond, extra = '') {
 }
 
 const frontendRoot = fileURLToPath(new URL('..', import.meta.url))
-const server = await createServer({ root: frontendRoot, server: { port: 4312 } })
+const backendPort = process.env.QTV_PORT || 8787
+const apiBase = process.env.VITE_API_BASE || `http://127.0.0.1:${backendPort}/api`
+
+const server = await createServer({
+  root: frontendRoot,
+  server: { port: 4312 },
+  define: {
+    'import.meta.env.VITE_API_BASE': JSON.stringify(apiBase),
+  },
+})
 await server.listen()
 // 4312 可能被既有 preview 进程占用（vite 非 strictPort 自动顺延）：以实际监听端口为准
 const addr = server.httpServer?.address()
 const uiPort = addr && typeof addr === 'object' ? addr.port : 4312
-
-const backendPort = process.env.QTV_PORT || 8787
 
 // 造一个验收用交易员（结束后软删还原空世界）
 const created = await fetch(`http://127.0.0.1:${backendPort}/api/traders`, {
