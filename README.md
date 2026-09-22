@@ -203,7 +203,7 @@ QTVictory 建立了极为严格的**文档先行（Documentation-First）**与**
                     全链路双向互链闭环 + 适时打 Git Tag
 ```
 
-### 4.2 七大协作红线（不可绕过）
+### 4.2 八大协作红线（不可绕过）
 
 1. **变更先行卡**：Bug 修复、功能回调、参数调整或接口微调，必须先在 `docs/devel/change/` 建立 `C00x` 变更卡（填写前后对比三联表、影响面分析与 Checklist）再修改代码，严禁先斩后奏；
 2. **待办缓冲池（零沉淀纪律）**：所有未入轨事项在 `docs/devel/todo/`（`now.md` / `future.md`）以表格登记。一旦事项建立 C 卡或落入设计稿，**必须立即从 todo 表格中物理删除**，`todo/` 坚决不保留 `[x]` 历史勾选项；
@@ -212,6 +212,7 @@ QTVictory 建立了极为严格的**文档先行（Documentation-First）**与**
 5. **历史版本归档库（只读封存）**：版本打出 Tag 后，该版本的 `plan/`、`task/`、`report/` 整体以及 `assessment/` 下的评分报告按 [docs/archive/README.md](docs/archive/README.md) SOP 物理迁移至 `docs/archive/<版本号>/` 只读封存；评分规则（标准与流程）及活文档（`design/`、`change/`、`todo/`、`env/`）常驻 `devel/` 持续轮转；
 6. **测试环境隔离红线**：本地测试实例运行必须与生产默认完全隔离（端口强制 `8788`、数据库强制 `local/data/qtvictory_test.db`，所有测试过程产物收拢至 `local/`，严禁污染源码树）；
 7. **治理流收口回调**：每次 change / design 治理链路走完（含收口、双向回写闭环、tag 打出）后，必须回调 `scripts/jev_workflow_check.py` 做治理状态自检，输出作为该链路的收口证据；自检判为“存在治理违规”时不得合入主干。
+8. **自检结果必呈人工**：凡调用治理自检脚本（含 `--offline` 与无 key 降级场景），AI 必须将原始输出与退出码如实完整呈报人工，非 0 退出码须附处置说明，严禁以“已自检 / 通过”概括或隐瞒结果。
 
 ### 4.3 完整文档地图
 
