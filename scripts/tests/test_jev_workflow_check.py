@@ -9,6 +9,10 @@
   8. 低置信语义判定被当硬判据：合规档位分布接近平手（0.44 vs 0.42）时误拦，
      违背 AGENTS.md「低置信需人工复核」（改为退出码 6 转人工）
   9. noul 题无 confidence 字段却常驻 ⚠ 低置信噪音，把提示稀释成背景音
+  10. noul 判罚用裸 p < 0.5、不看展示层尊重的 NOUL_UNCERTAIN_BAND，答案行写
+     「不确定」而结论行写「仍有同步点缺失」，同一份概率两层给出相反定性
+  11. 不确定带 ±0.15 对模型噪声过窄：同输入实跑 P=0.33~0.42 横跨下沿，
+     干净仓库被误拦 exit 4，而真实违规仅 P=0.06，两侧本有空档可切
 
 运行：python3 -m pytest scripts/tests -q
 """
@@ -73,11 +77,16 @@ def _state(**over):
 
 
 def _good_response(**over):
-    """一份结构完整、可顺利通过 validate_response 的响应。"""
+    """一份结构完整、可顺利通过 validate_response 的响应。
+
+    各 noul 默认值必须明确落在不确定带之外（P 距 0.5 不小于 NOUL_UNCERTAIN_BAND），
+    因为这份夹具代表"干净检查点"：任何一题落入带内都会变成人工复核项，
+    「本应无违规」的用例会随之失败。改默认值前先看 NOUL_UNCERTAIN_BAND。
+    """
     ans = {
         "current_stage": {"choice": "awaiting_merge_or_release", "confidence": 0.9},
         "pending_verification": {"noul": 0.1},
-        "sync_complete": {"noul": 0.7},
+        "sync_complete": {"noul": 0.9},
         "zero_sediment_ok": {"noul": 0.9},
         "compliance": {"choice": "整体合规，个别待办", "confidence": 0.9},
     }
@@ -310,6 +319,47 @@ class TestDetectViolation:
         r = _good_response(**{"pending_verification": {"noul": 0.95}})
         assert jwc.detect_violation(r, _consistent_state()) == []
 
+    @pytest.mark.parametrize("qid", ["sync_complete", "zero_sediment_ok"])
+    @pytest.mark.parametrize("prob", [0.30, 0.5, 0.70])
+    def test_noul_in_uncertain_band_is_not_a_hard_reason(self, qid, prob):
+        """概率落入不确定带（|P-0.5| < NOUL_UNCERTAIN_BAND）时，展示层把该题标为
+        「不确定」；门禁层就不能反过来写确定性结论，否则答案行与结论行自相矛盾。
+        此类判定转 semantic_review_items 交人工复核（exit 6）。"""
+        r = _good_response(**{qid: {"noul": prob}})
+        assert jwc.detect_violation(r, _consistent_state()) == []
+
+    @pytest.mark.parametrize("qid,prob,should_fire", [
+        ("sync_complete", 0.10, True),
+        ("sync_complete", 0.24, True),
+        ("sync_complete", 0.30, False),
+        ("sync_complete", 0.45, False),
+        ("sync_complete", 0.80, False),
+        ("zero_sediment_ok", 0.10, True),
+        ("zero_sediment_ok", 0.24, True),
+        ("zero_sediment_ok", 0.30, False),
+        ("zero_sediment_ok", 0.45, False),
+        ("zero_sediment_ok", 0.80, False),
+    ])
+    def test_noul_outside_band_still_gates(self, qid, prob, should_fire):
+        """带外一律照旧门禁：明确判否（P 低于 0.5 且越出不确定带）即违规。
+        真实沉淀违规实跑 P=0.06 落在这一侧，必须继续硬拦。"""
+        r = _good_response(**{qid: {"noul": prob}})
+        assert bool(jwc.detect_violation(r, _consistent_state())) is should_fire
+
+    @pytest.mark.parametrize("qid", ["sync_complete", "zero_sediment_ok"])
+    @pytest.mark.parametrize("prob,should_fire", [
+        (0.24, True),    # 距 0.5 为 0.26，刚越出带外沿 → 拦
+        (0.25, True),    # 距 0.5 恰为带宽：判定用严格小于，踩线不算不确定 → 拦
+        (0.26, False),   # 距 0.5 为 0.24，带内 → 转人工复核
+        (0.5, False),
+    ])
+    def test_noul_band_boundary_is_inclusive_of_uncertainty(self, qid, prob, should_fire):
+        """边界按严格小于判：|P-0.5| == NOUL_UNCERTAIN_BAND 时仍算带外、照旧门禁。
+        三个用例只差 0.02，用来锁死带宽语义不被无意改窄——干净仓库实跑噪声
+        P=0.33~0.42 必须落在带内，真实违规 P=0.06 必须落在带外。"""
+        r = _good_response(**{qid: {"noul": prob}})
+        assert bool(jwc.detect_violation(r, _consistent_state())) is should_fire
+
     @pytest.mark.parametrize("band,should_fire", [
         ("存在明确违规", True),
         ("有关键环节缺失或存疑", True),
@@ -455,9 +505,19 @@ class TestSemanticReview:
         assert jwc.STAGE_LABELS["has_violation"] in items[0]
 
     def test_noul_without_confidence_is_not_reviewed(self):
-        """noul 题没有 confidence 字段，概率是它唯一的信号。"""
+        """noul 题没有 confidence 字段，概率是它唯一的信号；带外概率不进复核清单。"""
         r = _good_response(**{"sync_complete": {"noul": 0.2}})
         assert jwc.semantic_review_items(r) == []
+
+    @pytest.mark.parametrize("qid", ["sync_complete", "zero_sediment_ok"])
+    @pytest.mark.parametrize("prob", [0.3, 0.5, 0.7])
+    def test_noul_in_uncertain_band_is_reviewed(self, qid, prob):
+        """带内概率是"模型自己也没定夺"：不进硬判据，但必须进复核清单（exit 6）。"""
+        r = _good_response(**{qid: {"noul": prob}})
+        items = jwc.semantic_review_items(r)
+        assert len(items) == 1
+        assert jwc.NOUL_LABELS[qid] in items[0]
+        assert "概率落入不确定带" in items[0]
 
     def test_offline_empty_response_has_no_review_item(self):
         assert jwc.semantic_review_items({}) == []

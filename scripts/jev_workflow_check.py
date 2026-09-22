@@ -26,7 +26,7 @@ jev_workflow_check.py — 用 TypeSafe 的 Jev（System One 模型）检查 QTVi
   python3 scripts/jev_workflow_check.py --api-key sk-.. # 命令行传 key；⚠ 会出现在 ps 等
   #    进程列表中，非交互场景建议改用环境变量或 credentials 文件
 
-退出码：0 正常；2 缺 key；3 采集或网络/API 失败；4 检测到治理违规（红线 7 门禁：存在违规不得合入主干）；5 Jev 响应无效（自检未完成，须修复后重跑）；6 语义判定置信不足（结论仅供参考，须人工核对采集事实后决策；人工确认前不得视为已完成自检）。
+退出码：0 正常；2 缺 key；3 采集或网络/API 失败；4 检测到治理违规（红线 7 门禁：存在违规不得合入主干）；5 Jev 响应无效（自检未完成，须修复后重跑）；6 语义判定不确定或置信不足（结论仅供参考，须人工核对采集事实后决策；人工确认前不得视为已完成自检）。
 """
 
 from __future__ import annotations
@@ -50,10 +50,18 @@ TYPESAFE_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 DEFAULT_MODEL = "jev-latest"
 HTTP_TIMEOUT = 45  # 秒
 
-# 置信门控阈值：低于该值则在输出中标注"低置信，建议人工复核"。
+# 置信门控阈值：低于该值则该判定降级为参考意见、不作为硬判据。
 CONFIDENCE_GATE = 0.60
-# Noul 概率距 0.5 小于该值视为"不确定"。
-NOUL_UNCERTAIN_BAND = 0.15
+# Noul 概率距 0.5 小于该值视为"不确定"：展示层据此标注，门禁层也据此
+# 放过（转人工复核），两层必须同源，否则会出现答案行写「不确定」而结论行
+# 写确定性违规的自相矛盾输出。
+#
+# 带宽取 0.25 而非更窄的值，依据是同一输入的实跑观测：干净仓库连续 4 次
+# 实跑 P(yes)=0.33/0.36/0.37/0.42，真实沉淀违规实跑 P(yes)=0.06。若按
+# 0.15 设带（下沿 0.35），干净仓库的噪声会横跨边界，使门禁退化成抛硬币
+# ——把干净检查点判成 exit 4，正是运营者学会忽略退出码的开端。0.25 的下沿
+# 落在观测到的「干净噪声上界 0.42」与「真实违规 0.06」之间的空档中部。
+NOUL_UNCERTAIN_BAND = 0.25
 
 # 阶段 Choice 选项 -> 人类可读标签
 STAGE_LABELS = {
@@ -897,7 +905,7 @@ def print_jev_answers(resp: dict) -> None:
             continue
         conf = ans.get("confidence")
         if abs(p - 0.5) < NOUL_UNCERTAIN_BAND:
-            verdict = "不确定（概率接近 0.5）"
+            verdict = "不确定（概率落入不确定带）"
         else:
             verdict = "是" if p >= 0.5 else "否"
         # noul 题的响应不带 confidence 字段（实测），概率是它唯一的信号。
@@ -1047,6 +1055,11 @@ def semantic_review_items(resp: dict) -> list:
         choice = answers[qid].get("choice")
         shown = STAGE_LABELS.get(choice, choice) if qid == "current_stage" else choice
         items.append(f"{label}「{shown}」置信 {conf:.2f}")
+    # noul 题没有 confidence 字段，其"不确定"由概率落入 NOUL_UNCERTAIN_BAND 表达
+    for qid, label in NOUL_LABELS.items():
+        p = answers.get(qid, {}).get("noul")
+        if _is_num(p) and abs(p - 0.5) < NOUL_UNCERTAIN_BAND:
+            items.append(f"{label}「概率落入不确定带」P={p:.2f}")
     return items
 
 
@@ -1056,7 +1069,8 @@ def detect_violation(resp: dict, state: dict) -> list:
     置信门控只作用于 Choice 型语义判定（compliance 档位、current_stage 判为
     has_violation、以及由 current_stage 派生的 cross_check）：置信未达
     CONFIDENCE_GATE 时这些判定降级为 semantic_review_items 的人工复核项，
-    不在此硬拦。noul 题没有 confidence 字段，其违规门禁只看概率、不受门控；
+    不在此硬拦。noul 题没有 confidence 字段，其违规门禁只看概率：概率明确越界才
+    拦，落入 NOUL_UNCERTAIN_BAND 的"不确定"转 semantic_review_items 交人工复核；
     代码侧硬判与 Jev 无关，任何模式下都同权执行。
     """
     reasons = []
@@ -1074,6 +1088,11 @@ def detect_violation(resp: dict, state: dict) -> list:
     for qid, (side, phrase) in NOUL_POLARITY.items():
         p = answers.get(qid, {}).get("noul")
         if not _is_num(p):
+            continue
+        # 概率落入不确定带时既非"是"也非"否"：展示层据此标「不确定」，门禁层
+        # 就不能反过来给确定性结论。交 semantic_review_items 转人工复核（exit 6），
+        # 否则会出现答案行写「不确定」、结论行写「仍有同步点缺失」的自相矛盾。
+        if abs(p - 0.5) < NOUL_UNCERTAIN_BAND:
             continue
         crossed = p < 0.5 if side == "low" else p >= 0.5
         if crossed:
