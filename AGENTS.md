@@ -43,6 +43,7 @@
 - 后端：`cd backend && pytest`
 - 前端：`cd frontend && npm test`（Vitest 单测）+ `npm run build`（tsc + Vite 构建）
 - E2E：`node frontend/scripts/e2e.mjs`（Playwright 无头几何验收）
+- 治理脚本：`python3 -m pytest scripts/tests -q`（jev 自检脚本单测，含流转账本配对 / 退出码门禁 / 红线 2 脏判定）
 
 ## 治理自检（收口必跑）
 
@@ -55,8 +56,9 @@ python3 scripts/jev_workflow_check.py
 - **Key 获取**：脚本自动读 `~/.config/typesafe/credentials.env`（可用 `TYPESAFE_CREDENTIALS_FILE` 覆盖），也可用 `--api-key` 或 `TYPESAFE_API_KEY` 环境变量；key 值严禁写入仓库或打印到输出。
 - **无 key 时的降级**：脚本只打印采集事实并返回 exit 2，此时链路仍须人工确认收口，不得视为已完成自检。
 - **违规即阻断**：脚本判为"存在治理违规"时，该链路不得合入主干，先修复违规再重跑。
-- **低置信需人工复核**：任一判定置信低于 0.60 会标注 ⚠，此时结论仅供参考，须人工核对采集事实后决策。
+- **低置信需人工复核**：任一 choice 型判定（当前阶段 / 整体合规）置信低于 0.60 时，该判定降级为参考意见、不作为硬判据；noul 型判定无置信字段，以概率为准。此时结论仅供参考，须人工核对采集事实后决策。
 - 只采集状态、不调用模型：`python3 scripts/jev_workflow_check.py --offline`。
+- **退出码语义**：`0` 未发现确定性违规；`2` 无 key；`3` API 调用失败；`4` 存在治理违规（不得合入主干，先修复再重跑）；`5` Jev 响应无效（须修复后重跑）；`6` 语义判定置信不足（结论仅供参考，须人工核对采集事实后决策；人工确认前不得视为已完成自检）。
 
 ## 测试环境（隔离红线）
 
