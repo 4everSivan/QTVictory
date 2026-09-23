@@ -1,6 +1,6 @@
 # QTVictory 文档归档库 (Archive)
 
-> **文档ID**: ARCHIVE-INDEX ｜ **定位**: 历史版本文档封存区（只读） ｜ **最后更新**: 2026-09-18
+> **文档ID**: ARCHIVE-INDEX ｜ **定位**: 历史版本文档封存区（只读） ｜ **最后更新**: 2026-09-23
 
 ---
 
@@ -23,7 +23,7 @@
 
 | 版本 | 目录 | 封存内容 | 对应 tag | 归档日期 |
 |---|---|---|---|---|
-| *（暂无归档——首个版本 tag 打出后按 §3 SOP 执行并在此登记）* | - | - | - | - |
+| v0.1.0 | [v0.1.0/](v0.1.0/) | Phase 1 里程碑计划（M1–M18）、任务卡（T01–T27）、阶段终验报告（01–04）与研发评分报告（03） | `v0.1.0` | 2026-09-23 |
 
 ---
 
@@ -35,7 +35,7 @@
    - 将 `docs/devel/` 下的 `plan`、`task`、`report` 三个目录整体 `git mv` 至 `docs/archive/<版本号>/`；
    - 将 `docs/devel/assessment/` 下该版本对应的评分报告（如 `03-评分报告.md`）`git mv` 至 `docs/archive/<版本号>/assessment/`；
    - **注意**：`docs/devel/assessment/` 下的 `01-评分标准.md`、`02-评分流程与证据清单.md` 与 `README.md` 必须原地保留，继续作为后续版本的评分规则事实源；
-3. 修正归档文档内部指向 devel 活文档的相对链接（层级 +1：`](../design/` → `](../../design/`、`](../change/` → `](../../change/`、`](../assessment/01-` → `](../../assessment/01-`）；归档各目录之间的相互链接按实际相对层级校对；
+3. 修正归档文档内部指向 devel 活文档的相对链接（层级 +1：`](../design/` → `](../../../devel/design/`、`](../change/` → `](../../../devel/change/`、`](../assessment/01-` → `](../../../devel/assessment/01-`）；归档各目录之间的相互链接按实际相对层级校对；
 4. 全库检索旧路径（`devel/plan`、`devel/task`、`devel/report` 及已迁移的评分报告路径），更新所有外部引用（导航、README、CHANGELOG、todo）；
 5. 在本文件 §2 索引表登记新版本行，更新 `最后更新` 日期；
 6. 新 Phase 立项时在 `docs/devel/` 下重建 `plan/` 与 `task/`；编号沿用只增序列（M、T 编号不复用已归档编号）。

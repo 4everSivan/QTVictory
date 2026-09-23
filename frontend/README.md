@@ -1,7 +1,7 @@
 # QTVictory 前端（观察员控制台）
 
 技术栈：TypeScript（strict）+ React 18 + Vite · 纯 SVG 图表 · Nothing 设计系统双主题。
-设计事实源：`../docs/devel/design/01-前端设计方案.md`（v2.1）；开发计划：`../docs/devel/plan/00-前端开发计划.md`。
+设计事实源：`../docs/devel/design/01-前端设计方案.md`（v2.1）；开发计划：`../docs/archive/v0.1.0/plan/00-前端开发计划.md`。
 
 ## 快速开始
 

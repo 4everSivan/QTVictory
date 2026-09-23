@@ -21,11 +21,12 @@ docs/
 │   ├── task/           # T01–T27 模块执行与验收卡
 │   ├── report/         # 阶段终验报告（M8 / M16 / M17 / M18）
 │   ├── env/            # 开发环境依赖盘点与磁盘清理指南
-│   ├── assessment/     # AI Agent 研发质量评估与证据体系
+│   ├── assessment/     # AI Agent 研发质量评估与证据体系（评分规则常驻，报告随版本归档）
 │   └── todo/           # 待办与需求缓冲池（按版本分文件登记，落地即移出）
 │
-├── archive/            # 【历史归档】版本 tag 后封存阶段文档（只读；规则已立，尚未启用）
-│   └── README.md       # 归档库索引、归档纪律与操作 SOP
+├── archive/            # 【历史归档】版本 tag 后封存阶段文档（只读；已归档 v0.1.0）
+│   ├── README.md       # 归档库索引、归档纪律与操作 SOP
+│   └── v0.1.0/         # Phase 1 封存文档快照（plan / task / report / assessment 报告）
 │
 └── guide/              # 【用户与运维指南】面向使用者与部署运维
     ├── README.md       # guide 子目录索引
@@ -44,9 +45,9 @@ docs/
 - [前端控制台设计方案](devel/design/01-前端设计方案.md)：Nothing 工业风单色灰阶设计系统、一屏五区栅格布局、纯 SVG 金融图表与三态主题规范（浅色/深色/跟随系统）。
 
 ### 2.2 了解开发过程与验收证据
-- [后端阶段终验报告 (M8)](devel/report/01-M8-验收报告.md)：§6.12 财务勾稽、25k ops/s 并发性能基准与全量端点覆盖（226 项测试全绿）。
-- [前端终验报告集 (M16/M17/M18)](devel/report/)：[M16 控制台联调终验](devel/report/02-M16-前端验收报告.md) + [M17 自选股编辑终验](devel/report/03-M17-自选股编辑验收报告.md) + [M18 K线分析工具终验](devel/report/04-M18-K线分析工具验收报告.md)（180 项 Vitest 单测全绿、Chromium 37 项像素级几何与交互验收零报错）。
-- [AI Agent 开发评分报告](devel/assessment/03-评分报告.md)：双线研发质量、防刷分量化评估与最终评分。
+- [后端阶段终验报告 (M8)](archive/v0.1.0/report/01-M8-验收报告.md)：§6.12 财务勾稽、25k ops/s 并发性能基准与全量端点覆盖（226 项测试全绿）。
+- [前端终验报告集 (M16/M17/M18)](archive/v0.1.0/report/)：[M16 控制台联调终验](archive/v0.1.0/report/02-M16-前端验收报告.md) + [M17 自选股编辑终验](archive/v0.1.0/report/03-M17-自选股编辑验收报告.md) + [M18 K线分析工具终验](archive/v0.1.0/report/04-M18-K线分析工具验收报告.md)（180 项 Vitest 单测全绿、Chromium 37 项像素级几何与交互验收零报错）。
+- [AI Agent 开发评分报告](archive/v0.1.0/assessment/03-评分报告.md)：双线研发质量、防刷分量化评估与最终评分（随 v0.1.0 已归档）。
 
 ### 2.3 日常维护与环境治理
 - [变更核验工作流与模板](devel/change/README.md)：解决 Bug 修复与功能回调时的抗漂移变更单与人工核验 Checklist。
