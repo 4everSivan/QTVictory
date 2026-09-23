@@ -1,5 +1,6 @@
 # ---- 参考材料（本地留存，不入库） ----
 reference/
+suggest.md
 
 # ---- AI / Agent 工具产生的隐藏目录 ----
 .superpowers/
